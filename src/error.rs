@@ -8,6 +8,7 @@ pub enum Error {
     Io(io::Error),
     SerdeJson(serde_json::Error),
     Reqwest(reqwest::Error),
+    BadResponse(String),
     Missing(&'static str),
 }
 
@@ -30,10 +31,11 @@ impl From<serde_json::Error> for Error {
 }
 
 impl Error {
-    fn msg(&self) -> Cow<'static, str> {
+    fn msg(&self) -> Cow<'_, str> {
         match self {
             Error::Io(err) => Cow::Owned(err.to_string()),
             Error::Missing(msg) => Cow::Borrowed(*msg),
+            Error::BadResponse(msg) => Cow::Borrowed(msg.as_str()),
             Error::Reqwest(err) => Cow::Owned(err.to_string()),
             Error::SerdeJson(err) => Cow::Owned(err.to_string()),
         }
@@ -51,6 +53,7 @@ impl Debug for Error {
         match self {
             Error::Io(err) => write!(f, "{err:?}"),
             Error::Missing(msg) => write!(f, "{msg}"),
+            Error::BadResponse(msg) => write!(f, "{msg}"),
             Error::Reqwest(err) => write!(f, "{err:?}"),
             Error::SerdeJson(err) => write!(f, "{err:?}"),
         }

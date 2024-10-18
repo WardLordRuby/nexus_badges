@@ -1,13 +1,17 @@
-use crate::cli::{Cli, Commands};
+use crate::{
+    await_user_for_end,
+    cli::{Cli, Commands},
+};
 use clap::Parser;
 use nexus_badges::*;
 
 #[tokio::main]
 async fn main() {
-    let mut input = match startup() {
+    let input = match startup() {
         Ok(data) => data,
         Err(err) => {
             eprintln!("{err}");
+            await_user_for_end();
             return;
         }
     };
@@ -16,46 +20,23 @@ async fn main() {
 
     if let Some(command) = cli.command {
         match command {
-            Commands::SetKey(keys) => {
-                input.update(keys);
-                match write(input, INPUT_PATH) {
-                    Ok(()) => println!("Key(s) updated"),
-                    Err(err) => eprintln!("{err}"),
-                }
-            }
+            Commands::SetKey(keys) => input
+                .update_keys(keys)
+                .unwrap_or_else(|err| eprintln!("{err}")),
             Commands::Init => init_remote(input)
                 .await
-                .unwrap_or_else(|err| eprintln!("{err:?}")),
-            Commands::Add(details) => {
-                if input.mods.contains(&details) {
-                    eprintln!("Mod already exists in: {INPUT_PATH}");
-                } else {
-                    input.mods.push(details);
-                    match write(input, INPUT_PATH) {
-                        Ok(()) => println!("Mod Registered!"),
-                        Err(err) => eprintln!("{err}"),
-                    }
-                }
-            }
-            Commands::Remove(details) => {
-                if let Some(i) = input
-                    .mods
-                    .iter()
-                    .position(|mod_details| *mod_details == details)
-                {
-                    input.mods.swap_remove(i);
-                    match write(input, INPUT_PATH) {
-                        Ok(()) => println!("Mod removed!"),
-                        Err(err) => eprintln!("{err}"),
-                    }
-                } else {
-                    eprintln!("Mod does not exist in: {INPUT_PATH}");
-                }
-            }
+                .unwrap_or_else(|err| eprintln!("{err}")),
+            Commands::Add(details) => input
+                .add_mod(details)
+                .unwrap_or_else(|err| eprintln!("{err}")),
+            Commands::Remove(details) => input
+                .remove_mod(details)
+                .unwrap_or_else(|err| eprintln!("{err}")),
         }
     } else {
         process(input)
             .await
-            .unwrap_or_else(|err| eprintln!("{err}"))
+            .unwrap_or_else(|err| eprintln!("{err}"));
+        await_user_for_end();
     }
 }

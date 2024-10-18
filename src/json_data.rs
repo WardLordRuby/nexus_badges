@@ -10,12 +10,13 @@ pub struct Input {
     pub mods: Vec<Mod>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ModDetails {
     pub name: String,
+    #[serde(skip_deserializing)]
+    pub url: String,
+    #[serde(skip_serializing)]
     pub uid: u64,
-    pub mod_id: usize,
-    pub domain_name: String,
     pub mod_downloads: usize,
     pub mod_unique_downloads: usize,
 }
@@ -40,6 +41,12 @@ pub struct Upload {
 #[derive(Deserialize)]
 pub struct GistResponse {
     pub id: String,
+    pub files: HashMap<String, FileDetails>,
+}
+
+#[derive(Deserialize)]
+pub struct FileDetails {
+    pub raw_url: String,
 }
 
 impl From<Upload> for GistNew {
