@@ -47,6 +47,7 @@ pub struct GistResponse {
 #[derive(Deserialize)]
 pub struct FileDetails {
     pub raw_url: String,
+    pub content: String,
 }
 
 impl From<Upload> for GistNew {

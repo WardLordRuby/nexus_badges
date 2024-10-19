@@ -8,6 +8,7 @@ const GIST_NAME: &str = "nexus_badges.json";
 const GIT_API_VER: &str = "2022-11-28";
 
 const NEXUS_INFO_OK: u16 = 200;
+const GIST_GET_OK: u16 = 200;
 const GIST_UPDATE_OK: u16 = 200;
 const GIST_CREATED: u16 = 201;
 
@@ -54,7 +55,7 @@ impl Mod {
     }
 }
 
-fn update_gist_endpoint() -> String {
+fn gist_id_endpoint() -> String {
     format!("{GIST_API}/{}", GIST_ID.get().expect("set on startup"))
 }
 
@@ -70,18 +71,23 @@ impl ModDetails {
 }
 
 impl GistResponse {
+    fn file_details(&self) -> Result<&FileDetails, Error> {
+        self.files.get(GIST_NAME).ok_or_else(|| {
+            Error::BadResponse(format!(
+                "Gist response did not contains details about any file with the name: {GIST_NAME}"
+            ))
+        })
+    }
+
     fn universal_url(&self) -> Result<&str, Error> {
-        self.files
-            .get(GIST_NAME)
-            .ok_or_else(|| {
-                Error::BadResponse(format!(
-                    "Gist response did not contains details about any file with the name: {GIST_NAME}"
-                ))
-            })
-            .map(|entry| {
-                let i = entry.raw_url.find(RAW).expect("always contains `RAW`");
-                &entry.raw_url[..i + RAW.len()]
-            })
+        self.file_details().map(|entry| {
+            let i = entry.raw_url.find(RAW).expect("always contains `RAW`");
+            &entry.raw_url[..i + RAW.len()]
+        })
+    }
+
+    fn content(&self) -> Result<&str, Error> {
+        self.file_details().map(|entry| entry.content.as_str())
     }
 }
 
@@ -115,15 +121,6 @@ impl Input {
             return Err(Error::Missing(
                 "Git fine-grained token missing, Use command 'set' to store private token\n\
                 ouput will be saved locally",
-            ));
-        }
-        Ok(())
-    }
-
-    fn verify_gist(&self) -> Result<(), Error> {
-        if self.gist_id.is_empty() {
-            return Err(Error::Missing(
-                "Use command 'init' to initialize a new remote gist",
             ));
         }
         Ok(())
@@ -174,6 +171,17 @@ impl Input {
     }
 }
 
+async fn verify_gist() -> Result<(String, GistResponse), Error> {
+    if GIST_ID.get().expect("set on startup").is_empty() {
+        return Err(Error::Missing(
+            "Use command 'init' to initialize a new remote gist",
+        ));
+    }
+    let endpoint = gist_id_endpoint();
+    let meta = get_remote(&endpoint).await?;
+    Ok((endpoint, meta))
+}
+
 async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>, Error> {
     input.verify_nexus()?;
     input.verify_added()?;
@@ -187,7 +195,7 @@ async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>
 
     let mut output = HashMap::new();
     for task in tasks {
-        let data = task.await.unwrap()?;
+        let data = task.await.expect("task can't panic")?;
         assert!(
             output.insert(data.uid, data).is_none(),
             "duplicate entry in: {INPUT_PATH}"
@@ -195,22 +203,33 @@ async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>
     }
 
     write(output.clone(), OUPUT_PATH)?;
+
+    println!(
+        "Retrieved and saved locally download counts for {} mod(s)",
+        output.len()
+    );
+
     Ok(output)
 }
 
 pub async fn process(input: Input) -> Result<(), Error> {
-    let gist_set = input.verify_gist();
+    let output_task = tokio::task::spawn(update_download_counts(input));
+    let verify_gist_task = tokio::task::spawn(verify_gist());
 
-    let output = update_download_counts(input).await?;
-    gist_set?;
+    let (gist_endpoint, prev_remote) = verify_gist_task.await.expect("task can't panic")?;
+    let output = output_task.await.expect("task can't panic")?;
 
-    let gist_meta = update_remote().await?;
-    let universal_url = gist_meta.universal_url()?;
+    let new_content = serde_json::to_string_pretty(&output)?;
 
-    println!(
-        "Remote gist successfully updated with download counts for {} mod(s)",
-        output.len()
-    );
+    if prev_remote.content()? != new_content {
+        update_remote(&gist_endpoint, new_content).await?;
+    } else {
+        println!(
+            "Download counts for tracked mod(s) have not changed, remote gist was not modified"
+        );
+    }
+
+    let universal_url = prev_remote.universal_url()?;
 
     write_badges(output, universal_url)
 }
@@ -251,18 +270,36 @@ pub async fn init_remote(mut input: Input) -> Result<(), Error> {
     Ok(())
 }
 
-async fn update_remote() -> Result<GistResponse, Error> {
-    let processed_output = read_to_string(OUPUT_PATH)?;
-    let body = serde_json::to_string(&GistUpdate::from(Upload::from(processed_output)))?;
+async fn update_remote(gist_endpoint: &str, content: String) -> Result<GistResponse, Error> {
+    let body = serde_json::to_string(&GistUpdate::from(Upload::from(content)))?;
 
     let server_response = reqwest::Client::new()
-        .patch(update_gist_endpoint())
+        .patch(gist_endpoint)
         .headers(gist_header())
         .body(body)
         .send()
         .await?;
 
     if server_response.status() != GIST_UPDATE_OK {
+        return Err(Error::BadResponse(server_response.text().await?));
+    }
+
+    println!("Remote gist successfully updated");
+
+    server_response
+        .json::<GistResponse>()
+        .await
+        .map_err(Error::from)
+}
+
+async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Error> {
+    let server_response = reqwest::Client::new()
+        .get(gist_endpoint)
+        .headers(gist_header())
+        .send()
+        .await?;
+
+    if server_response.status() != GIST_GET_OK {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
