@@ -3,7 +3,7 @@ pub mod error;
 pub mod json_data;
 
 const NEXUS_BASE_URL: &str = "https://api.nexusmods.com";
-const GIST_ENDPOINT: &str = "https://api.github.com/gists";
+const GIST_API: &str = "https://api.github.com/gists";
 const GIST_NAME: &str = "nexus_badges.json";
 const GIT_API_VER: &str = "2022-11-28";
 
@@ -11,7 +11,7 @@ const NEXUS_INFO_OK: u16 = 200;
 const GIST_UPDATE_OK: u16 = 200;
 const GIST_CREATED: u16 = 201;
 
-const RAW: &str = "raw/";
+const RAW: &str = "/raw/";
 
 const IO_DIR: &str = "io";
 pub const INPUT_PATH: &str = "io/input.json";
@@ -55,22 +55,33 @@ impl Mod {
 }
 
 fn update_gist_endpoint() -> String {
-    format!("{GIST_ENDPOINT}/{}", GIST_ID.get().expect("set on startup"))
+    format!("{GIST_API}/{}", GIST_ID.get().expect("set on startup"))
 }
 
 fn git_token_h_key() -> String {
     format!("Bearer {}", GIT_TOKEN.get().expect("set on startup"))
 }
 
-fn disregard_commit(url: &str) -> &str {
-    let i = url.find(RAW).expect("always contains `RAW`");
-    &url[..i + RAW.len()]
-}
-
 impl ModDetails {
     fn add_url(mut self, from: &Mod) -> Self {
         self.url = from.url();
         self
+    }
+}
+
+impl GistResponse {
+    fn universal_url(&self) -> Result<&str, Error> {
+        self.files
+            .get(GIST_NAME)
+            .ok_or_else(|| {
+                Error::BadResponse(format!(
+                    "Gist response did not contains details about any file with the name: {GIST_NAME}"
+                ))
+            })
+            .map(|entry| {
+                let i = entry.raw_url.find(RAW).expect("always contains `RAW`");
+                &entry.raw_url[..i + RAW.len()]
+            })
     }
 }
 
@@ -163,19 +174,6 @@ impl Input {
     }
 }
 
-impl GistResponse {
-    fn remove_raw_url(&mut self) -> Result<String, Error> {
-        self.files
-            .remove(GIST_NAME)
-            .ok_or_else(|| {
-                Error::BadResponse(format!(
-                    "Gist response did not contains details about any file with the name: {GIST_NAME}"
-                ))
-            })
-            .map(|entry| entry.raw_url)
-    }
-}
-
 async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>, Error> {
     input.verify_nexus()?;
     input.verify_added()?;
@@ -206,8 +204,8 @@ pub async fn process(input: Input) -> Result<(), Error> {
     let output = update_download_counts(input).await?;
     gist_set?;
 
-    let raw_url = update_remote().await?.remove_raw_url()?;
-    let universal_url = disregard_commit(&raw_url);
+    let gist_meta = update_remote().await?;
+    let universal_url = gist_meta.universal_url()?;
 
     println!(
         "Remote gist successfully updated with download counts for {} mod(s)",
@@ -225,7 +223,7 @@ pub async fn init_remote(mut input: Input) -> Result<(), Error> {
     let body = serde_json::to_string(&GistNew::from(Upload::from(processed_output)))?;
 
     let server_response = reqwest::Client::new()
-        .post(GIST_ENDPOINT)
+        .post(GIST_API)
         .headers(gist_header())
         .body(body)
         .send()
@@ -248,7 +246,7 @@ pub async fn init_remote(mut input: Input) -> Result<(), Error> {
     input.gist_id = std::mem::take(&mut meta.id);
     write(input, INPUT_PATH)?;
 
-    write_badges(output, &meta.remove_raw_url()?)?;
+    write_badges(output, meta.universal_url()?)?;
 
     Ok(())
 }
@@ -345,9 +343,9 @@ pub fn write<T: Serialize>(data: T, file: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn write_badges(output: HashMap<u64, ModDetails>, url: &str) -> Result<(), Error> {
+fn write_badges(output: HashMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
     let mut file = File::create(BADGES_PATH)?;
-    let encoded_url = percent_encode(url.as_bytes(), CUSTOM_ENCODE_SET).to_string();
+    let encoded_url = percent_encode(universal_url.as_bytes(), CUSTOM_ENCODE_SET).to_string();
 
     for (uid, entry) in output.into_iter() {
         writeln!(file, "<!-- {} -->", entry.name)?;
