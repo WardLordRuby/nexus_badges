@@ -3,6 +3,11 @@ name = "nexus_badges"
 version = "0.2.0"
 edition = "2021"
 
+[package.metadata.winresource]
+ProductName = "Nexus Badges"
+FileDescription = "Badge generator"
+ProductVersion = "0.2.0"
+
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
 percent-encoding = "2.3.1"
@@ -10,6 +15,9 @@ reqwest = { version = "0.12.8", features = ["json"] }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.131"
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
+
+[build-dependencies]
+winresource = "0.1.17"
 
 [profile.release]
 strip = "debuginfo"
