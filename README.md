@@ -10,10 +10,11 @@
 # Nexus Badges
 [![GitHub Downloads](https://img.shields.io/github/downloads/WardLordRuby/nexus_badges/total?label=Downloads&labelColor=%2323282e&color=%230e8726)][latest-dl]
 [![GitHub License](https://img.shields.io/github/license/WardLordRuby/nexus_badges?label=License&labelColor=%2323282e)](LICENSE)  
-CLI tool that automates the process of creating and updating dynamic [shields.io][Shields-io] badges that display Download counts of mods hosted on [Nexus Mods][Nexus].
-This program uses a private gist as a json endpoint for the dynamic badge to pull the download count from. The count for all tracked mods is stored within the same private
-gist. Supports tracking of multiple Nexus Mods. Unique badges will be generated for each tracked mod. Download counts saved in the gist endpoint are fetched directly from
-the Nexus api.  
+
+Nexus Badges is a CLI tool that automates the process of creating and updating dynamic [shields.io][Shields-io] badges that display Download counts of mods hosted on
+[Nexus Mods][Nexus]. This program uses a private gist as a json endpoint for the dynamic badge to pull the download count from. The count for all tracked mods is stored 
+within the same private gist. Supports tracking of multiple Nexus Mods. Unique badges will be generated for each tracked mod. Download counts saved in the gist endpoint
+are fetched directly from the Nexus api.  
 
 ## Prerequisites
 - Find your Nexus 'Personal API Key' by logging in to Nexus Mods, then head to [next.nexusmods.com/settings/api-keys][Nexus-key]. Scrolling all the way to the bottom
