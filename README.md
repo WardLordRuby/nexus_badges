@@ -2,9 +2,15 @@
 [Nexus]: https://www.nexusmods.com  
 [Nexus-key]: https://next.nexusmods.com/settings/api-keys  
 [Git-key]: https://github.com/settings/tokens?type=beta  
+[Latest-dl]: https://github.com/WardLordRuby/nexus_badges/releases/download/v0.2.0/nexus_badges.exe
+<div align="center">
+    <img src="https://raw.githubusercontent.com/WardLordRuby/nexus_badges/refs/heads/main/assets/Icon.png" width="15%" height="15%">
+</div>
 
 # Nexus Badges
-CLI tool to automate the process of creating and updating dynamic [shields.io][Shields-io] badges that display Download counts of mods hosted on [Nexus Mods][Nexus].
+[![GitHub Downloads](https://img.shields.io/github/downloads/WardLordRuby/nexus_badges/total?label=Downloads&labelColor=%2323282e&color=%230e8726)][latest-dl]
+[![GitHub License](https://img.shields.io/github/license/WardLordRuby/nexus_badges?label=License&labelColor=%2323282e)](LICENSE)  
+CLI tool that automates the process of creating and updating dynamic [shields.io][Shields-io] badges that display Download counts of mods hosted on [Nexus Mods][Nexus].
 This program uses a private gist as a json endpoint for the dynamic badge to pull the download count from. The count for all tracked mods is stored within the same private
 gist. Supports tracking of multiple Nexus Mods. Unique badges will be generated for each tracked mod. Download counts saved in the gist endpoint are fetched directly from
 the Nexus api.  
@@ -23,7 +29,7 @@ the Nexus api.
 </div>
 
 ## Usage
-Download latest release of nexus_badges.exe or build from the source code. Use the `set-key` command to input your personal tokens.  
+Download latest release of [nexus_badges.exe][Latest-dl] or build from the source code. Use the `set-key` command to input your personal tokens.  
 ```
 nexus_badges.exe set-key --git <GIT_TOKEN> --nexus <NEXUS_TOKEN>
 ```
