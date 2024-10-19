@@ -17,6 +17,7 @@ const IO_DIR: &str = "io";
 pub const INPUT_PATH: &str = "io/input.json";
 pub const OUPUT_PATH: &str = "io/output.json";
 const BADGES_PATH: &str = "io/badges.md";
+const BADGES_PATH_LOCAL: &str = ".\\io\\badges.md";
 
 static NEXUS_KEY: OnceLock<String> = OnceLock::new();
 static GIT_TOKEN: OnceLock<String> = OnceLock::new();
@@ -105,9 +106,6 @@ impl Input {
                 ouput will be saved locally",
             ));
         }
-        if !self.gist_id.is_empty() {
-            println!("Replacing gist_id: {}", self.gist_id);
-        }
         Ok(())
     }
 
@@ -165,10 +163,10 @@ impl Input {
     }
 }
 
-pub async fn process(input: Input) -> Result<(), Error> {
+async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>, Error> {
     input.verify_nexus()?;
     input.verify_added()?;
-    let remote_gist = input.verify_gist();
+
     let client = reqwest::Client::new();
     let tasks = input
         .mods
@@ -184,27 +182,31 @@ pub async fn process(input: Input) -> Result<(), Error> {
             "duplicate entry in: {INPUT_PATH}"
         );
     }
-    let count = output.len();
-
-    if let Err(err) = remote_gist {
-        write(output, OUPUT_PATH)?;
-        return Err(err);
-    }
 
     write(output.clone(), OUPUT_PATH)?;
+    Ok(output)
+}
+
+pub async fn process(input: Input) -> Result<(), Error> {
+    let gist_set = input.verify_gist();
+
+    let output = update_download_counts(input).await?;
+    gist_set?;
 
     let raw_url = update_remote().await?;
     let universal_url = disregard_commit(&raw_url);
 
-    println!("Remote gist successfully updated with download counts for {count} mod(s)");
+    println!(
+        "Remote gist successfully updated with download counts for {} mod(s)",
+        output.len()
+    );
 
     write_badges(output, universal_url)
 }
 
 pub async fn init_remote(mut input: Input) -> Result<(), Error> {
-    input.verify_added()?;
     input.verify_git()?;
-    process(input.clone()).await?;
+    update_download_counts(input.clone()).await?;
 
     let processed_output = read_to_string(OUPUT_PATH)?;
     let body = serde_json::to_string(&GistNew::from(Upload::from(processed_output)))?;
@@ -220,7 +222,16 @@ pub async fn init_remote(mut input: Input) -> Result<(), Error> {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
+    println!("New private gist created with name: {GIST_NAME}");
+
     let meta = server_response.json::<GistResponse>().await?;
+
+    if !input.gist_id.is_empty() && input.gist_id != meta.id {
+        println!("Replacing gist_id: {}", input.gist_id);
+    }
+
+    println!("New gist_id: {}", meta.id);
+
     input.gist_id = meta.id;
     write(input, INPUT_PATH)?;
 
@@ -335,7 +346,7 @@ fn write_badges(output: HashMap<u64, ModDetails>, url: &str) -> Result<(), Error
         writeln!(file)?;
     }
 
-    println!("Badges saved to: {BADGES_PATH}");
+    println!("Badges saved to: {BADGES_PATH_LOCAL}");
     Ok(())
 }
 
