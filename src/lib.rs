@@ -163,6 +163,19 @@ impl Input {
     }
 }
 
+impl GistResponse {
+    fn remove_raw_url(&mut self) -> Result<String, Error> {
+        self.files
+            .remove(GIST_NAME)
+            .ok_or_else(|| {
+                Error::BadResponse(format!(
+                    "Gist response did not contains details about any file with the name: {GIST_NAME}"
+                ))
+            })
+            .map(|entry| entry.raw_url)
+    }
+}
+
 async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>, Error> {
     input.verify_nexus()?;
     input.verify_added()?;
@@ -193,7 +206,7 @@ pub async fn process(input: Input) -> Result<(), Error> {
     let output = update_download_counts(input).await?;
     gist_set?;
 
-    let raw_url = update_remote().await?;
+    let raw_url = update_remote().await?.remove_raw_url()?;
     let universal_url = disregard_commit(&raw_url);
 
     println!(
@@ -206,7 +219,7 @@ pub async fn process(input: Input) -> Result<(), Error> {
 
 pub async fn init_remote(mut input: Input) -> Result<(), Error> {
     input.verify_git()?;
-    update_download_counts(input.clone()).await?;
+    let output = update_download_counts(input.clone()).await?;
 
     let processed_output = read_to_string(OUPUT_PATH)?;
     let body = serde_json::to_string(&GistNew::from(Upload::from(processed_output)))?;
@@ -224,7 +237,7 @@ pub async fn init_remote(mut input: Input) -> Result<(), Error> {
 
     println!("New private gist created with name: {GIST_NAME}");
 
-    let meta = server_response.json::<GistResponse>().await?;
+    let mut meta = server_response.json::<GistResponse>().await?;
 
     if !input.gist_id.is_empty() && input.gist_id != meta.id {
         println!("Replacing gist_id: {}", input.gist_id);
@@ -232,13 +245,15 @@ pub async fn init_remote(mut input: Input) -> Result<(), Error> {
 
     println!("New gist_id: {}", meta.id);
 
-    input.gist_id = meta.id;
+    input.gist_id = std::mem::take(&mut meta.id);
     write(input, INPUT_PATH)?;
+
+    write_badges(output, &meta.remove_raw_url()?)?;
 
     Ok(())
 }
 
-async fn update_remote() -> Result<String, Error> {
+async fn update_remote() -> Result<GistResponse, Error> {
     let processed_output = read_to_string(OUPUT_PATH)?;
     let body = serde_json::to_string(&GistUpdate::from(Upload::from(processed_output)))?;
 
@@ -253,13 +268,10 @@ async fn update_remote() -> Result<String, Error> {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
-    let mut meta = server_response.json::<GistResponse>().await?;
-    meta.files.remove(GIST_NAME).map_or(
-        Err(Error::BadResponse(format!(
-            "Gist response did not contains details about any file with the name: {GIST_NAME}"
-        ))),
-        |entry| Ok(entry.raw_url),
-    )
+    server_response
+        .json::<GistResponse>()
+        .await
+        .map_err(Error::from)
 }
 
 fn gist_header() -> reqwest::header::HeaderMap {
