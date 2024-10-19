@@ -41,7 +41,7 @@ nexus_badges.exe set-key --git <GIT_TOKEN> --nexus <NEXUS_TOKEN>
 
 To track the download count of a nexus mod use the `add` command. Mods are tracked by their 'game_domain' and 'mod_id'. Locating them is easy by looking at the mod's url.  
 ```
-nexus_badges.exe add -domain eldenring -mod-id 4825
+nexus_badges.exe add --domain eldenring --mod-id 4825
 ```
 To initialize the private gist that will store the download counts use the `init` command  
 ```
