@@ -4,9 +4,10 @@
 [Git-key]: https://github.com/settings/tokens?type=beta  
 
 # Nexus Badges
-CLI tool to automate the process of creating and updating dynamic [shields.io][Shields-io] badges for displaying Download counts of mods hosted on [Nexus Mods][Nexus].
+CLI tool to automate the process of creating and updating dynamic [shields.io][Shields-io] badges that display Download counts of mods hosted on [Nexus Mods][Nexus].
 This program uses a private gist as a json endpoint for the dynamic badge to pull the download count from. The count for all tracked mods is stored within the same private
-gist. Supports tracking of multiple Nexus Mods. Unique badges will be generated for each tracked mod. Download counts are fetched directly from the Nexus api.  
+gist. Supports tracking of multiple Nexus Mods. Unique badges will be generated for each tracked mod. Download counts saved in the gist endpoint are fetched directly from
+the Nexus api.  
 
 ## Prerequisites
 - Find your Nexus 'Personal API Key' by logging in to Nexus Mods, then head to [next.nexusmods.com/settings/api-keys][Nexus-key]. Scrolling all the way to the bottom
