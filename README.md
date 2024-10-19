@@ -6,7 +6,7 @@
 # Nexus Badges
 CLI tool to automate the process of creating and updating dynamic [shields.io][Shields-io] badges for displaying Download counts of mods hosted on [Nexus Mods][Nexus].
 This program uses a private gist as a json endpoint for the dynamic badge to pull the download count from. The count for all tracked mods is stored within the same private
-gist. Download counts are fetched directly from the Nexus api.  
+gist. Supports tracking of multiple Nexus Mods. Unique badges will be generated for each tracked mod. Download counts are fetched directly from the Nexus api.  
 
 ## Prerequisites
 - Find your Nexus 'Personal API Key' by logging in to Nexus Mods, then head to [next.nexusmods.com/settings/api-keys][Nexus-key]. Scrolling all the way to the bottom
@@ -23,23 +23,19 @@ gist. Download counts are fetched directly from the Nexus api.
 
 ## Usage
 Download latest release of nexus_badges.exe or build from the source code. Use the `set-key` command to input your personal tokens.  
-
 ```
 nexus_badges.exe set-key --git <GIT_TOKEN> --nexus <NEXUS_TOKEN>
 ```
 
 <div align="center">  
-  <img src="https://i.imgur.com/7OMHQc2.png" width="70%">  
+  <img src="https://i.imgur.com/888tw4j.png" width="70%">  
 </div>  
 
 To track the download count of a nexus mod use the `add` command. Mods are tracked by their 'game_domain' and 'mod_id'. Locating them is easy by looking at the mod's url.  
-
 ```
 nexus_badges.exe add -domain eldenring -mod-id 4825
 ```
-
 To initialize the private gist that will store the download counts use the `init` command  
-
 ```
 nexus_badges.exe init
 ```
