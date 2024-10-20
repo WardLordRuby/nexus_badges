@@ -2,7 +2,7 @@
 [Nexus]: https://www.nexusmods.com  
 [Nexus-key]: https://next.nexusmods.com/settings/api-keys  
 [Git-key]: https://github.com/settings/tokens?type=beta  
-[Latest-dl]: https://github.com/WardLordRuby/nexus_badges/releases/download/v0.2.0/nexus_badges.exe
+[Latest-dl]: https://github.com/WardLordRuby/nexus_badges/releases/download/v0.2.1/nexus_badges.exe
 <div align="center">
     <img src="https://raw.githubusercontent.com/WardLordRuby/nexus_badges/refs/heads/main/assets/Icon.png" width="15%" height="15%">
 </div>
