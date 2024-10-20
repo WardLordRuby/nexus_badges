@@ -34,11 +34,12 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::BTreeMap,
     fs::{read_to_string, File},
     io::{self, BufRead, BufReader, ErrorKind, Write},
     sync::OnceLock,
 };
+use tokio::task::JoinSet;
 
 impl Mod {
     fn get_info_endpoint(&self) -> String {
@@ -182,24 +183,38 @@ async fn verify_gist() -> Result<(String, GistResponse), Error> {
     Ok((endpoint, meta))
 }
 
-async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>, Error> {
+async fn update_download_counts(input: Input) -> Result<BTreeMap<u64, ModDetails>, Error> {
     input.verify_nexus()?;
     input.verify_added()?;
 
     let client = reqwest::Client::new();
-    let tasks = input
-        .mods
-        .into_iter()
-        .map(|details| tokio::task::spawn(try_get_info(details, client.clone())))
-        .collect::<Vec<_>>();
+    let mut tasks = JoinSet::new();
 
-    let mut output = HashMap::new();
-    for task in tasks {
-        let data = task.await.expect("task can't panic")?;
-        assert!(
-            output.insert(data.uid, data).is_none(),
-            "duplicate entry in: {INPUT_PATH}"
-        );
+    for descriptor in input.mods.into_iter() {
+        tasks.spawn(try_get_info(descriptor, client.clone()));
+    }
+
+    let mut output = BTreeMap::new();
+
+    while let Some(res) = tasks.join_next().await {
+        match res {
+            Ok(Ok(data)) => {
+                if let Some(dup) = output.insert(data.uid, data) {
+                    tasks.abort_all();
+                    while tasks.join_next().await.is_some() {}
+                    return Err(Error::Io(io::Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("duplicate tracked mod: {}, in: {INPUT_PATH}", dup.name),
+                    )));
+                }
+            }
+            Ok(Err(err)) => {
+                tasks.abort_all();
+                while tasks.join_next().await.is_some() {}
+                return Err(err);
+            }
+            Err(_) => unreachable!("task can't panic"),
+        }
     }
 
     write(output.clone(), OUPUT_PATH)?;
@@ -213,11 +228,10 @@ async fn update_download_counts(input: Input) -> Result<HashMap<u64, ModDetails>
 }
 
 pub async fn process(input: Input) -> Result<(), Error> {
-    let output_task = tokio::task::spawn(update_download_counts(input));
-    let verify_gist_task = tokio::task::spawn(verify_gist());
+    let (output_res, verify_res) = tokio::join!(update_download_counts(input), verify_gist());
 
-    let (gist_endpoint, prev_remote) = verify_gist_task.await.expect("task can't panic")?;
-    let output = output_task.await.expect("task can't panic")?;
+    let (gist_endpoint, prev_remote) = verify_res?;
+    let output = output_res?;
 
     let new_content = serde_json::to_string_pretty(&output)?;
 
@@ -380,7 +394,7 @@ pub fn write<T: Serialize>(data: T, file: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn write_badges(output: HashMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
+fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
     let mut file = File::create(BADGES_PATH)?;
     let encoded_url = percent_encode(universal_url.as_bytes(), CUSTOM_ENCODE_SET).to_string();
 
