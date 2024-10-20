@@ -96,7 +96,7 @@ impl GistResponse {
 }
 
 impl Input {
-    fn verify_nexus(&self) -> Result<(), Error> {
+    fn verify_nexus(&self) -> Result<&Self, Error> {
         if self.nexus_key.is_empty() {
             return Err(Error::Missing(
                 "Nexus api key missing. Use command 'set' to store private key",
@@ -108,26 +108,26 @@ impl Input {
                 ouput will be saved locally"
             )
         }
-        Ok(())
+        Ok(self)
     }
 
-    fn verify_added(&self) -> Result<(), Error> {
+    fn verify_added(&self) -> Result<&Self, Error> {
         if self.mods.is_empty() {
             return Err(Error::Missing(
                 "No mods registered, use the command 'add' to register a mod",
             ));
         }
-        Ok(())
+        Ok(self)
     }
 
-    fn verify_git(&self) -> Result<(), Error> {
+    fn verify_git(&self) -> Result<&Self, Error> {
         if self.git_token.is_empty() {
             return Err(Error::Missing(
                 "Git fine-grained token missing, Use command 'set' to store private token\n\
                 ouput will be saved locally",
             ));
         }
-        Ok(())
+        Ok(self)
     }
 
     pub fn add_mod(mut self, details: Mod) -> Result<(), Error> {
@@ -187,14 +187,7 @@ async fn verify_gist() -> Result<(String, GistResponse), Error> {
 }
 
 async fn check_program_version() -> reqwest::Result<()> {
-    let client = reqwest::Client::new();
-    let version = client
-        .get(VERSION_URL)
-        .timeout(std::time::Duration::from_secs(4))
-        .send()
-        .await?
-        .json::<Version>()
-        .await?;
+    let version = reqwest::get(VERSION_URL).await?.json::<Version>().await?;
     if version.latest != env!("CARGO_PKG_VERSION") {
         println!("{}", version.message);
     }
@@ -202,8 +195,7 @@ async fn check_program_version() -> reqwest::Result<()> {
 }
 
 async fn update_download_counts(input: Input) -> Result<BTreeMap<u64, ModDetails>, Error> {
-    input.verify_nexus()?;
-    input.verify_added()?;
+    input.verify_nexus()?.verify_added()?;
 
     let client = reqwest::Client::new();
     let mut tasks = JoinSet::new();
