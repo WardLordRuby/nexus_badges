@@ -75,3 +75,9 @@ impl From<String> for Upload {
         Upload { content: value }
     }
 }
+
+#[derive(Deserialize)]
+pub struct Version {
+    pub latest: String,
+    pub message: String,
+}

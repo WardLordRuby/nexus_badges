@@ -20,6 +20,9 @@ pub const OUPUT_PATH: &str = "io/output.json";
 const BADGES_PATH: &str = "io/badges.md";
 const BADGES_PATH_LOCAL: &str = ".\\io\\badges.md";
 
+const VERSION_URL: &str =
+    "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw/";
+
 static NEXUS_KEY: OnceLock<String> = OnceLock::new();
 static GIT_TOKEN: OnceLock<String> = OnceLock::new();
 static GIST_ID: OnceLock<String> = OnceLock::new();
@@ -181,6 +184,21 @@ async fn verify_gist() -> Result<(String, GistResponse), Error> {
     let endpoint = gist_id_endpoint();
     let meta = get_remote(&endpoint).await?;
     Ok((endpoint, meta))
+}
+
+async fn check_program_version() -> reqwest::Result<()> {
+    let client = reqwest::Client::new();
+    let version = client
+        .get(VERSION_URL)
+        .timeout(std::time::Duration::from_secs(4))
+        .send()
+        .await?
+        .json::<Version>()
+        .await?;
+    if version.latest != env!("CARGO_PKG_VERSION") {
+        println!("{}", version.message);
+    }
+    Ok(())
 }
 
 async fn update_download_counts(input: Input) -> Result<BTreeMap<u64, ModDetails>, Error> {
@@ -361,9 +379,12 @@ async fn try_get_info(details: Mod, client: reqwest::Client) -> Result<ModDetail
 }
 
 pub fn startup() -> Result<Input, Error> {
+    tokio::task::spawn(check_program_version());
+
     if !std::fs::exists(IO_DIR)? {
         std::fs::create_dir(IO_DIR)?;
     }
+
     let input = match read::<Input>(INPUT_PATH) {
         Ok(data) => data,
         Err(err) => match err {
