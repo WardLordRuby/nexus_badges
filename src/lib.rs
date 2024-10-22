@@ -23,6 +23,9 @@ const BADGES_PATH_LOCAL: &str = ".\\io\\badges.md";
 const VERSION_URL: &str =
     "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw/";
 
+const ENV_NAME_NEXUS: &str = "NEXUS_KEY";
+const ENV_NAME_GIT: &str = "GIT_TOKEN";
+
 static NEXUS_KEY: OnceLock<String> = OnceLock::new();
 static GIT_TOKEN: OnceLock<String> = OnceLock::new();
 static GIST_ID: OnceLock<String> = OnceLock::new();
@@ -96,40 +99,6 @@ impl GistResponse {
 }
 
 impl Input {
-    fn verify_nexus(&self) -> Result<&Self, Error> {
-        if self.nexus_key.is_empty() {
-            return Err(Error::Missing(
-                "Nexus api key missing. Use command 'set' to store private key",
-            ));
-        }
-        if self.git_token.is_empty() {
-            println!(
-                "Git fine-grained token missing, Use command 'set' to store private token\n\
-                ouput will be saved locally"
-            )
-        }
-        Ok(self)
-    }
-
-    fn verify_added(&self) -> Result<&Self, Error> {
-        if self.mods.is_empty() {
-            return Err(Error::Missing(
-                "No mods registered, use the command 'add' to register a mod",
-            ));
-        }
-        Ok(self)
-    }
-
-    fn verify_git(&self) -> Result<&Self, Error> {
-        if self.git_token.is_empty() {
-            return Err(Error::Missing(
-                "Git fine-grained token missing, Use command 'set' to store private token\n\
-                ouput will be saved locally",
-            ));
-        }
-        Ok(self)
-    }
-
     pub fn add_mod(mut self, details: Mod) -> Result<(), Error> {
         if self.mods.contains(&details) {
             Err(Error::Io(io::Error::new(
@@ -175,6 +144,40 @@ impl Input {
     }
 }
 
+fn verify_added(mods: &[Mod]) -> Result<(), Error> {
+    if mods.is_empty() {
+        return Err(Error::Missing(
+            "No mods registered, use the command 'add' to register a mod",
+        ));
+    }
+    Ok(())
+}
+
+fn verify_nexus() -> Result<(), Error> {
+    if NEXUS_KEY.get().expect("set on startup").is_empty() {
+        return Err(Error::Missing(
+            "Nexus api key missing. Use command 'set' to store private key",
+        ));
+    }
+    if GIT_TOKEN.get().expect("set on startup").is_empty() {
+        println!(
+            "Git fine-grained token missing, Use command 'set' to store private token\n\
+            ouput will be saved locally"
+        )
+    }
+    Ok(())
+}
+
+fn verify_git() -> Result<(), Error> {
+    if GIT_TOKEN.get().expect("set on startup").is_empty() {
+        return Err(Error::Missing(
+            "Git fine-grained token missing, Use command 'set' to store private token\n\
+            ouput will be saved locally",
+        ));
+    }
+    Ok(())
+}
+
 async fn verify_gist() -> Result<(String, GistResponse), Error> {
     if GIST_ID.get().expect("set on startup").is_empty() {
         return Err(Error::Missing(
@@ -194,13 +197,14 @@ async fn check_program_version() -> reqwest::Result<()> {
     Ok(())
 }
 
-async fn update_download_counts(input: Input) -> Result<BTreeMap<u64, ModDetails>, Error> {
-    input.verify_nexus()?.verify_added()?;
+async fn update_download_counts(mods: Vec<Mod>) -> Result<BTreeMap<u64, ModDetails>, Error> {
+    verify_nexus()?;
+    verify_added(&mods)?;
 
     let client = reqwest::Client::new();
     let mut tasks = JoinSet::new();
 
-    for descriptor in input.mods.into_iter() {
+    for descriptor in mods.into_iter() {
         tasks.spawn(try_get_info(descriptor, client.clone()));
     }
 
@@ -238,7 +242,7 @@ async fn update_download_counts(input: Input) -> Result<BTreeMap<u64, ModDetails
 }
 
 pub async fn process(input: Input) -> Result<(), Error> {
-    let (output_res, verify_res) = tokio::join!(update_download_counts(input), verify_gist());
+    let (output_res, verify_res) = tokio::join!(update_download_counts(input.mods), verify_gist());
 
     let (gist_endpoint, prev_remote) = verify_res?;
     let output = output_res?;
@@ -258,9 +262,10 @@ pub async fn process(input: Input) -> Result<(), Error> {
     write_badges(output, universal_url)
 }
 
-pub async fn init_remote(mut input: Input) -> Result<(), Error> {
-    input.verify_git()?;
-    let output = update_download_counts(input.clone()).await?;
+pub async fn init_remote(input: Input) -> Result<(), Error> {
+    verify_git()?;
+    let mut updated_input = input.clone();
+    let output = update_download_counts(input.mods).await?;
 
     let processed_output = read_to_string(OUPUT_PATH)?;
     let body = serde_json::to_string(&GistNew::from(Upload::from(processed_output)))?;
@@ -286,8 +291,8 @@ pub async fn init_remote(mut input: Input) -> Result<(), Error> {
 
     println!("New gist_id: {}", meta.id);
 
-    input.gist_id = std::mem::take(&mut meta.id);
-    write(input, INPUT_PATH)?;
+    updated_input.gist_id = std::mem::take(&mut meta.id);
+    write(updated_input, INPUT_PATH)?;
 
     write_badges(output, meta.universal_url()?)?;
 
@@ -388,8 +393,18 @@ pub fn startup() -> Result<Input, Error> {
         },
     };
 
-    NEXUS_KEY.set(input.nexus_key.clone()).expect("only set");
-    GIT_TOKEN.set(input.git_token.clone()).expect("only set");
+    let nexus_key = match std::env::var(ENV_NAME_NEXUS) {
+        Ok(key) => key,
+        Err(_) => input.nexus_key.clone(),
+    };
+
+    let git_token = match std::env::var(ENV_NAME_GIT) {
+        Ok(key) => key,
+        Err(_) => input.git_token.clone(),
+    };
+
+    NEXUS_KEY.set(nexus_key).expect("only set");
+    GIT_TOKEN.set(git_token).expect("only set");
     GIST_ID.set(input.gist_id.clone()).expect("only set");
     Ok(input)
 }
@@ -401,15 +416,15 @@ pub fn read<T: for<'de> Deserialize<'de>>(path: &str) -> Result<T, Error> {
     Ok(data)
 }
 
-pub fn write<T: Serialize>(data: T, file: &str) -> Result<(), Error> {
-    let file = File::create(file)?;
+pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
+    let file = File::create(path)?;
     serde_json::to_writer_pretty(file, &data)?;
     Ok(())
 }
 
 fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
     let mut file = File::create(BADGES_PATH)?;
-    let encoded_url = percent_encode(universal_url.as_bytes(), CUSTOM_ENCODE_SET).to_string();
+    let encoded_url = percent_encode(universal_url.as_bytes(), CUSTOM_ENCODE_SET);
 
     for (uid, entry) in output.into_iter() {
         writeln!(file, "<!-- {} -->", entry.name)?;
