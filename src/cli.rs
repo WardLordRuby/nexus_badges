@@ -17,7 +17,7 @@ pub enum Commands {
     /// Remove mod from input data
     Remove(Mod),
 
-    /// Input Private keys
+    /// Input Private keys to be stored locally (or uploaded as Repository secrets)
     #[command(alias = "set")]
     SetKey(SetKeyArgs),
 

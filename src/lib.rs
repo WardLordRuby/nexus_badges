@@ -4,8 +4,10 @@ pub mod json_data;
 
 const NEXUS_BASE_URL: &str = "https://api.nexusmods.com";
 const GIST_API: &str = "https://api.github.com/gists";
-const GIST_NAME: &str = "nexus_badges.json";
 const GIT_API_VER: &str = "2022-11-28";
+
+const GIST_NAME: &str = "nexus_badges.json";
+const GIST_DESC: &str = "Private gist to be used as a json endpoint for badge download counters";
 
 const NEXUS_INFO_OK: u16 = 200;
 const GIST_GET_OK: u16 = 200;
@@ -30,6 +32,13 @@ static NEXUS_KEY: OnceLock<String> = OnceLock::new();
 static GIT_TOKEN: OnceLock<String> = OnceLock::new();
 static GIST_ID: OnceLock<String> = OnceLock::new();
 
+// MARK: TODO's
+// 1. Upload and update Repository secrets
+//    Figure out encription
+// 2. Commit (non-sensitive) input.json
+// 3. Upload and schedule Action Workflow
+// 4. Build on multiple targets
+
 use crate::{
     cli::{Mod, SetKeyArgs},
     error::Error,
@@ -41,7 +50,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    fs::{read_to_string, File},
+    fs::File,
     io::{self, BufRead, BufReader, ErrorKind, Write},
     sync::OnceLock,
 };
@@ -267,13 +276,20 @@ pub async fn init_remote(input: Input) -> Result<(), Error> {
     let mut updated_input = input.clone();
     let output = update_download_counts(input.mods).await?;
 
-    let processed_output = read_to_string(OUPUT_PATH)?;
-    let body = serde_json::to_string(&GistNew::from(Upload::from(processed_output)))?;
+    let content = serde_json::to_string_pretty(&output)?;
 
     let server_response = reqwest::Client::new()
         .post(GIST_API)
         .headers(gist_header())
-        .body(body)
+        .json(&serde_json::json!({
+            "description": GIST_DESC,
+            "public": false,
+            "files": {
+                GIST_NAME: {
+                    "content": content
+                }
+            }
+        }))
         .send()
         .await?;
 
@@ -300,12 +316,16 @@ pub async fn init_remote(input: Input) -> Result<(), Error> {
 }
 
 async fn update_remote(gist_endpoint: &str, content: String) -> Result<GistResponse, Error> {
-    let body = serde_json::to_string(&GistUpdate::from(Upload::from(content)))?;
-
     let server_response = reqwest::Client::new()
         .patch(gist_endpoint)
         .headers(gist_header())
-        .body(body)
+        .json(&serde_json::json!({
+            "files": {
+                GIST_NAME: {
+                    "content": content
+                }
+            }
+        }))
         .send()
         .await?;
 
