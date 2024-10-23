@@ -20,8 +20,9 @@ async fn main() {
 
     if let Some(command) = cli.command {
         match command {
-            Commands::SetKey(keys) => input
-                .update_keys(keys)
+            Commands::SetArg(args) => input
+                .update_args(args)
+                .await
                 .unwrap_or_else(|err| eprintln!("{err}")),
             Commands::Init => init_remote(input)
                 .await
@@ -31,6 +32,9 @@ async fn main() {
                 .unwrap_or_else(|err| eprintln!("{err}")),
             Commands::Remove(details) => input
                 .remove_mod(details)
+                .unwrap_or_else(|err| eprintln!("{err}")),
+            Commands::InitActions => init_actions(input)
+                .await
                 .unwrap_or_else(|err| eprintln!("{err}")),
         }
     } else {

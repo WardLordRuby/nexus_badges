@@ -2,14 +2,39 @@ pub mod cli;
 pub mod error;
 pub mod json_data;
 
+// MARK: TODO
+// Separate into modules
+
+use crate::{
+    cli::{Mod, SetArgs},
+    error::Error,
+    json_data::*,
+};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use crypto_box::{aead::OsRng, PublicKey};
+use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
+use reqwest::header::{HeaderMap, HeaderValue};
+use serde::{Deserialize, Serialize};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    fs::File,
+    io::{self, BufRead, BufReader, ErrorKind, Write},
+    sync::{Arc, OnceLock},
+};
+use tokio::task::JoinSet;
+
 const NEXUS_BASE_URL: &str = "https://api.nexusmods.com";
-const GIST_API: &str = "https://api.github.com/gists";
+const GIT_BASE_URL: &str = "https://api.github.com";
 const GIT_API_VER: &str = "2022-11-28";
 
 const GIST_NAME: &str = "nexus_badges.json";
 const GIST_DESC: &str = "Private gist to be used as a json endpoint for badge download counters";
 
 const NEXUS_INFO_OK: u16 = 200;
+const GIT_PUBLIC_KEY_OK: u16 = 200;
+const GIT_SECRET_CREATED: u16 = 201;
+const GIT_SECRET_UPDATED: u16 = 204;
 const GIST_GET_OK: u16 = 200;
 const GIST_UPDATE_OK: u16 = 200;
 const GIST_CREATED: u16 = 201;
@@ -28,33 +53,38 @@ const VERSION_URL: &str =
 const ENV_NAME_NEXUS: &str = "NEXUS_KEY";
 const ENV_NAME_GIT: &str = "GIT_TOKEN";
 
-static NEXUS_KEY: OnceLock<String> = OnceLock::new();
-static GIT_TOKEN: OnceLock<String> = OnceLock::new();
-static GIST_ID: OnceLock<String> = OnceLock::new();
+static VARS: OnceLock<StartupVars> = OnceLock::new();
 
-// MARK: TODO's
-// 1. Upload and update Repository secrets
-//    Figure out encription
-// 2. Commit (non-sensitive) input.json
-// 3. Upload and schedule Action Workflow
-// 4. Build on multiple targets
+#[derive(Debug)]
+struct StartupVars {
+    nexus_key: String,
+    git_token: String,
+    gist_id: String,
+    owner: String,
+    repo: String,
+}
 
-use crate::{
-    cli::{Mod, SetKeyArgs},
-    error::Error,
-    json_data::*,
-};
-use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
-use reqwest::header::{HeaderMap, HeaderValue};
-use serde::{Deserialize, Serialize};
-use std::{
-    borrow::Cow,
-    collections::BTreeMap,
-    fs::File,
-    io::{self, BufRead, BufReader, ErrorKind, Write},
-    sync::OnceLock,
-};
-use tokio::task::JoinSet;
+impl From<&Input> for StartupVars {
+    fn from(value: &Input) -> Self {
+        let nexus_key = match std::env::var(ENV_NAME_NEXUS) {
+            Ok(key) => key,
+            Err(_) => value.nexus_key.clone(),
+        };
+
+        let git_token = match std::env::var(ENV_NAME_GIT) {
+            Ok(key) => key,
+            Err(_) => value.git_token.clone(),
+        };
+
+        StartupVars {
+            nexus_key,
+            git_token,
+            gist_id: value.gist_id.clone(),
+            owner: value.owner.clone(),
+            repo: value.repo.clone(),
+        }
+    }
+}
 
 impl Mod {
     fn get_info_endpoint(&self) -> String {
@@ -72,11 +102,34 @@ impl Mod {
 }
 
 fn gist_id_endpoint() -> String {
-    format!("{GIST_API}/{}", GIST_ID.get().expect("set on startup"))
+    format!(
+        "{GIT_BASE_URL}/gists/{}",
+        VARS.get().expect("set on startup").gist_id
+    )
+}
+
+fn gist_endpoint() -> String {
+    format!("{GIT_BASE_URL}/gists",)
+}
+
+fn repository_public_key_endpoint() -> String {
+    let vars = VARS.get().expect("set on startup");
+    format!(
+        "{GIT_BASE_URL}/repos/{}/{}/actions/secrets/public-key",
+        vars.owner, vars.repo
+    )
+}
+
+fn repository_secret_endpoint(secret_name: &str) -> String {
+    let vars = VARS.get().expect("set on startup");
+    format!(
+        "{GIT_BASE_URL}/repos/{}/{}/actions/secrets/{secret_name}",
+        vars.owner, vars.repo
+    )
 }
 
 fn git_token_h_key() -> String {
-    format!("Bearer {}", GIT_TOKEN.get().expect("set on startup"))
+    format!("Bearer {}", VARS.get().expect("set on startup").git_token)
 }
 
 impl ModDetails {
@@ -140,15 +193,76 @@ impl Input {
         }
     }
 
-    pub fn update_keys(mut self, new: SetKeyArgs) -> Result<(), Error> {
+    // MARK: TODO
+    // If actions are setup we should update the workflow after valid changes
+    pub async fn update_args(mut self, mut new: SetArgs) -> Result<(), Error> {
+        let try_update_secrets = verify_repo().is_ok();
+        let (mut new_git_token, mut new_nexus_key) = (None, None);
+
         if let Some(token) = new.git {
+            if try_update_secrets {
+                new_git_token = Some(token.clone());
+            }
             self.git_token = token;
         }
         if let Some(key) = new.nexus {
+            if try_update_secrets {
+                new_nexus_key = Some(key.clone());
+            }
             self.nexus_key = key;
         }
+        if let Some(ref mut id) = new.gist {
+            std::mem::swap(&mut self.gist_id, id);
+        }
+        if let Some(repo) = new.repo {
+            self.repo = repo;
+        }
+        if let Some(owner) = new.owner {
+            self.owner = owner;
+        }
+
         write(self, INPUT_PATH)?;
-        println!("Key(s) updated");
+
+        if let Some(prev_id) = new.gist {
+            if !prev_id.is_empty() {
+                // MARK: XXX
+                // Do we require confirmation for these kind of overwrites?
+                println!("WARN: Previously stored gist_id: {prev_id}, was replaced");
+            }
+        }
+
+        println!("Key(s) updated locally");
+
+        if try_update_secrets && (new_git_token.is_some() || new_nexus_key.is_some()) {
+            let public_key = get_public_key().await.map(Some).unwrap_or_else(|err| {
+                eprintln!("{err}");
+                None
+            });
+
+            let mut tasks = JoinSet::new();
+
+            if let Some(key) = public_key {
+                let key_arc = Arc::new(key);
+                if let Some(secret) = new_git_token {
+                    let key_clone = Arc::clone(&key_arc);
+                    tasks.spawn(async move {
+                        set_repository_secret(ENV_NAME_GIT, &secret, &key_clone).await
+                    });
+                }
+                if let Some(secret) = new_nexus_key {
+                    tasks.spawn(async move {
+                        set_repository_secret(ENV_NAME_NEXUS, &secret, &key_arc).await
+                    });
+                }
+            }
+
+            while let Some(res) = tasks.join_next().await {
+                if let Err(err) = res {
+                    eprintln!("{err}")
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -163,12 +277,13 @@ fn verify_added(mods: &[Mod]) -> Result<(), Error> {
 }
 
 fn verify_nexus() -> Result<(), Error> {
-    if NEXUS_KEY.get().expect("set on startup").is_empty() {
+    let vars = VARS.get().expect("set on startup");
+    if vars.nexus_key.is_empty() {
         return Err(Error::Missing(
             "Nexus api key missing. Use command 'set' to store private key",
         ));
     }
-    if GIT_TOKEN.get().expect("set on startup").is_empty() {
+    if vars.git_token.is_empty() {
         println!(
             "Git fine-grained token missing, Use command 'set' to store private token\n\
             ouput will be saved locally"
@@ -178,17 +293,16 @@ fn verify_nexus() -> Result<(), Error> {
 }
 
 fn verify_git() -> Result<(), Error> {
-    if GIT_TOKEN.get().expect("set on startup").is_empty() {
+    if VARS.get().expect("set on startup").git_token.is_empty() {
         return Err(Error::Missing(
-            "Git fine-grained token missing, Use command 'set' to store private token\n\
-            ouput will be saved locally",
+            "Git fine-grained token missing, Use command 'set' to store private token",
         ));
     }
     Ok(())
 }
 
 async fn verify_gist() -> Result<(String, GistResponse), Error> {
-    if GIST_ID.get().expect("set on startup").is_empty() {
+    if VARS.get().expect("set on startup").gist_id.is_empty() {
         return Err(Error::Missing(
             "Use command 'init' to initialize a new remote gist",
         ));
@@ -196,6 +310,21 @@ async fn verify_gist() -> Result<(String, GistResponse), Error> {
     let endpoint = gist_id_endpoint();
     let meta = get_remote(&endpoint).await?;
     Ok((endpoint, meta))
+}
+
+fn verify_repo() -> Result<(), Error> {
+    let vars = VARS.get().expect("set on startup");
+    if vars.repo.is_empty() {
+        return Err(Error::Missing(
+            "Use command 'set --repo' to input your forked 'nexus_badges'",
+        ));
+    }
+    if vars.owner.is_empty() {
+        return Err(Error::Missing(
+            "Use command 'set --owner' to input your GitHub username",
+        ));
+    }
+    Ok(())
 }
 
 async fn check_program_version() -> reqwest::Result<()> {
@@ -279,8 +408,8 @@ pub async fn init_remote(input: Input) -> Result<(), Error> {
     let content = serde_json::to_string_pretty(&output)?;
 
     let server_response = reqwest::Client::new()
-        .post(GIST_API)
-        .headers(gist_header())
+        .post(gist_endpoint())
+        .headers(git_header())
         .json(&serde_json::json!({
             "description": GIST_DESC,
             "public": false,
@@ -315,10 +444,29 @@ pub async fn init_remote(input: Input) -> Result<(), Error> {
     Ok(())
 }
 
+pub async fn init_actions(_input: Input) -> Result<(), Error> {
+    verify_repo()?;
+
+    let public_key = get_public_key().await?;
+    let vars = VARS.get().expect("set on startup");
+    let (res1, res2) = tokio::join!(
+        set_repository_secret(ENV_NAME_GIT, &vars.git_token, &public_key),
+        set_repository_secret(ENV_NAME_NEXUS, &vars.nexus_key, &public_key)
+    );
+
+    res1?;
+    res2?;
+    // MARK: TODO's
+    // 1. Commit (non-sensitive) input.json
+    // 2. Upload and schedule Action Workflow
+    // 3. Build on multiple targets
+    Ok(())
+}
+
 async fn update_remote(gist_endpoint: &str, content: String) -> Result<GistResponse, Error> {
     let server_response = reqwest::Client::new()
         .patch(gist_endpoint)
-        .headers(gist_header())
+        .headers(git_header())
         .json(&serde_json::json!({
             "files": {
                 GIST_NAME: {
@@ -344,7 +492,7 @@ async fn update_remote(gist_endpoint: &str, content: String) -> Result<GistRespo
 async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Error> {
     let server_response = reqwest::Client::new()
         .get(gist_endpoint)
-        .headers(gist_header())
+        .headers(git_header())
         .send()
         .await?;
 
@@ -358,7 +506,7 @@ async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Error> {
         .map_err(Error::from)
 }
 
-fn gist_header() -> reqwest::header::HeaderMap {
+fn git_header() -> reqwest::header::HeaderMap {
     [
         ("User-Agent", Cow::Borrowed(env!("CARGO_PKG_NAME"))),
         ("Accept", Cow::Borrowed("application/vnd.github+json")),
@@ -380,7 +528,7 @@ async fn try_get_info(details: Mod, client: reqwest::Client) -> Result<ModDetail
     let server_response = client
         .get(details.get_info_endpoint())
         .header("accept", "application/json")
-        .header("apikey", NEXUS_KEY.get().unwrap())
+        .header("apikey", &VARS.get().expect("set on startup").nexus_key)
         .send()
         .await?;
 
@@ -393,6 +541,67 @@ async fn try_get_info(details: Mod, client: reqwest::Client) -> Result<ModDetail
         .await
         .map(|output| output.add_url(&details))
         .map_err(Error::from)
+}
+
+async fn get_public_key() -> Result<RepositoryPublicKey, Error> {
+    let server_response = reqwest::Client::new()
+        .get(repository_public_key_endpoint())
+        .headers(git_header())
+        .send()
+        .await?;
+
+    if server_response.status() != GIT_PUBLIC_KEY_OK {
+        return Err(Error::BadResponse(server_response.text().await?));
+    }
+
+    server_response
+        .json::<RepositoryPublicKey>()
+        .await
+        .map_err(Error::from)
+}
+
+async fn set_repository_secret(
+    secret_name: &str,
+    secret: &str,
+    public_key: &RepositoryPublicKey,
+) -> Result<(), Error> {
+    let encrypted_secret = encrypt_secret(secret, &public_key.key)?;
+
+    let server_response = reqwest::Client::new()
+        .put(repository_secret_endpoint(secret_name))
+        .headers(git_header())
+        .json(&serde_json::json!({
+            "encrypted_value": encrypted_secret,
+            "key_id": public_key.key_id,
+        }))
+        .send()
+        .await?;
+
+    if server_response.status() == GIT_SECRET_CREATED
+        || server_response.status() == GIT_SECRET_UPDATED
+    {
+        println!(
+            "Repository secret: {secret_name}, {}",
+            match server_response.status() {
+                s if s == GIT_SECRET_CREATED => "created",
+                s if s == GIT_SECRET_UPDATED => "updated",
+                _ => unreachable!("by outer if"),
+            }
+        );
+        return Ok(());
+    }
+
+    Err(Error::BadResponse(server_response.text().await?))
+}
+
+fn encrypt_secret(secret: &str, public_key: &str) -> Result<String, Error> {
+    let public_key = PublicKey::from_slice(&BASE64.decode(public_key)?).map_err(|err| {
+        io::Error::new(ErrorKind::InvalidData, format!("Invalid public key: {err}"))
+    })?;
+
+    let encrypted_bytes = public_key.seal(&mut OsRng, secret.as_bytes())?;
+
+    Ok(BASE64.encode(&encrypted_bytes))
 }
 
 pub fn startup() -> Result<Input, Error> {
@@ -413,19 +622,7 @@ pub fn startup() -> Result<Input, Error> {
         },
     };
 
-    let nexus_key = match std::env::var(ENV_NAME_NEXUS) {
-        Ok(key) => key,
-        Err(_) => input.nexus_key.clone(),
-    };
-
-    let git_token = match std::env::var(ENV_NAME_GIT) {
-        Ok(key) => key,
-        Err(_) => input.git_token.clone(),
-    };
-
-    NEXUS_KEY.set(nexus_key).expect("only set");
-    GIT_TOKEN.set(git_token).expect("only set");
-    GIST_ID.set(input.gist_id.clone()).expect("only set");
+    VARS.set(StartupVars::from(&input)).expect("only set");
     Ok(input)
 }
 

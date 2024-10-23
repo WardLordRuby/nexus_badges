@@ -9,7 +9,9 @@ FileDescription = "Badge generator"
 ProductVersion = "0.2.1"
 
 [dependencies]
+base64 = "0.22.1"
 clap = { version = "4.5.20", features = ["derive"] }
+crypto_box = { version = "0.9.1", features = ["seal"] }
 percent-encoding = "2.3.1"
 reqwest = { version = "0.12.8", features = ["json"] }
 serde = { version = "1.0.213", features = ["derive"] }
