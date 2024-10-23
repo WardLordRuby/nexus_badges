@@ -1,4 +1,4 @@
-use crate::cli::Mod;
+use crate::models::cli::Mod;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
