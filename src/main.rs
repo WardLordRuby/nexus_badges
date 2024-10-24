@@ -1,6 +1,6 @@
 use crate::{
     await_user_for_end,
-    commands::{init_actions, init_remote, process},
+    commands::{init_actions, init_remote, process, update_args, Modify},
     models::cli::{Cli, Commands},
 };
 use clap::Parser;
@@ -8,7 +8,9 @@ use nexus_badges::*;
 
 #[tokio::main]
 async fn main() {
-    let input = match startup() {
+    let cli = Cli::parse();
+
+    let input_mods = match startup(cli.remote) {
         Ok(data) => data,
         Err(err) => {
             eprintln!("{err}");
@@ -17,29 +19,26 @@ async fn main() {
         }
     };
 
-    let cli = Cli::parse();
-
     if let Some(command) = cli.command {
         match command {
-            Commands::SetArg(args) => input
-                .update_args(args)
+            Commands::SetArg(args) => update_args(input_mods, args)
                 .await
                 .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::Init => init_remote(input)
-                .await
-                .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::Add(details) => input
+            Commands::Add(details) => input_mods
                 .add_mod(details)
                 .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::Remove(details) => input
+            Commands::Remove(details) => input_mods
                 .remove_mod(details)
                 .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::InitActions => init_actions(input)
+            Commands::Init => init_remote(input_mods)
+                .await
+                .unwrap_or_else(|err| eprintln!("{err}")),
+            Commands::InitActions => init_actions(input_mods)
                 .await
                 .unwrap_or_else(|err| eprintln!("{err}")),
         }
     } else {
-        process(input)
+        process(input_mods)
             .await
             .unwrap_or_else(|err| eprintln!("{err}"));
         await_user_for_end();

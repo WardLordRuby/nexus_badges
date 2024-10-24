@@ -12,6 +12,7 @@ pub enum Error {
     Missing(&'static str),
     Decode(base64::DecodeError),
     Encrypt(crypto_box::aead::Error),
+    Env(std::env::VarError),
 }
 
 impl From<reqwest::Error> for Error {
@@ -44,6 +45,12 @@ impl From<crypto_box::aead::Error> for Error {
     }
 }
 
+impl From<std::env::VarError> for Error {
+    fn from(value: std::env::VarError) -> Self {
+        Error::Env(value)
+    }
+}
+
 impl Error {
     fn msg(&self) -> Cow<'_, str> {
         match self {
@@ -54,6 +61,7 @@ impl Error {
             Error::SerdeJson(err) => Cow::Owned(err.to_string()),
             Error::Decode(err) => Cow::Owned(err.to_string()),
             Error::Encrypt(err) => Cow::Owned(err.to_string()),
+            Error::Env(err) => Cow::Owned(err.to_string()),
         }
     }
 }
@@ -74,6 +82,7 @@ impl Debug for Error {
             Error::SerdeJson(err) => write!(f, "{err:?}"),
             Error::Decode(err) => write!(f, "{err:?}"),
             Error::Encrypt(err) => write!(f, "{err:?}"),
+            Error::Env(err) => write!(f, "{err:?}"),
         }
     }
 }

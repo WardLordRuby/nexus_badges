@@ -34,6 +34,8 @@ const BADGES_PATH_LOCAL: &str = ".\\io\\badges.md";
 
 const ENV_NAME_NEXUS: &str = "NEXUS_KEY";
 const ENV_NAME_GIT: &str = "GIT_TOKEN";
+const ENV_NAME_GIST_ID: &str = "GIST_ID";
+const ENV_NAME_MODS: &str = "TRACKED_MODS";
 
 const VERSION_URL: &str =
     "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw/";
@@ -116,7 +118,7 @@ async fn check_program_version() -> reqwest::Result<()> {
 }
 
 #[derive(Debug)]
-struct StartupVars {
+pub struct StartupVars {
     nexus_key: String,
     git_token: String,
     gist_id: String,
@@ -124,48 +126,72 @@ struct StartupVars {
     repo: String,
 }
 
-impl From<&Input> for StartupVars {
-    fn from(value: &Input) -> Self {
-        let nexus_key = match std::env::var(ENV_NAME_NEXUS) {
-            Ok(key) => key,
-            Err(_) => value.nexus_key.clone(),
-        };
-
-        let git_token = match std::env::var(ENV_NAME_GIT) {
-            Ok(key) => key,
-            Err(_) => value.git_token.clone(),
-        };
-
+impl From<&mut Input> for StartupVars {
+    fn from(value: &mut Input) -> Self {
         StartupVars {
-            nexus_key,
-            git_token,
-            gist_id: value.gist_id.clone(),
-            owner: value.owner.clone(),
-            repo: value.repo.clone(),
+            nexus_key: std::mem::take(&mut value.nexus_key),
+            git_token: std::mem::take(&mut value.git_token),
+            gist_id: std::mem::take(&mut value.gist_id),
+            owner: std::mem::take(&mut value.owner),
+            repo: std::mem::take(&mut value.repo),
         }
     }
 }
 
-pub fn startup() -> Result<Input, Error> {
+impl Input {
+    pub fn from(startup: &StartupVars, mods: Vec<Mod>) -> Self {
+        Input {
+            git_token: startup.git_token.clone(),
+            nexus_key: startup.nexus_key.clone(),
+            gist_id: startup.gist_id.clone(),
+            owner: startup.owner.clone(),
+            repo: startup.repo.clone(),
+            mods,
+        }
+    }
+
+    fn from_file() -> Result<Self, Error> {
+        match read(INPUT_PATH) {
+            Ok(data) => Ok(data),
+            Err(err) => match err {
+                Error::Io(err) if err.kind() == ErrorKind::NotFound => {
+                    eprintln!(
+                        "Could not find: {INPUT_PATH}. Continuing with default data structure"
+                    );
+                    Ok(Input::default())
+                }
+                _ => Err(err),
+            },
+        }
+    }
+
+    fn from_env() -> Result<Self, Error> {
+        Ok(Input {
+            git_token: std::env::var(ENV_NAME_GIT)?,
+            nexus_key: std::env::var(ENV_NAME_NEXUS)?,
+            gist_id: std::env::var(ENV_NAME_GIST_ID)?,
+            owner: String::new(),
+            repo: String::new(),
+            mods: serde_json::from_str(&std::env::var(ENV_NAME_MODS)?)?,
+        })
+    }
+}
+
+pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
     tokio::task::spawn(check_program_version());
 
     if !std::fs::exists(IO_DIR)? {
         std::fs::create_dir(IO_DIR)?;
     }
 
-    let input = match read::<Input>(INPUT_PATH) {
-        Ok(data) => data,
-        Err(err) => match err {
-            Error::Io(err) if err.kind() == ErrorKind::NotFound => {
-                eprintln!("Could not find: {INPUT_PATH}. Continuing with default data structure");
-                Input::default()
-            }
-            _ => return Err(err),
-        },
-    };
+    let mut input = if on_remote {
+        Input::from_env()
+    } else {
+        Input::from_file()
+    }?;
 
-    VARS.set(StartupVars::from(&input)).expect("only set");
-    Ok(input)
+    VARS.set(StartupVars::from(&mut input)).expect("only set");
+    Ok(input.mods)
 }
 
 pub fn read<T: for<'de> Deserialize<'de>>(path: &str) -> Result<T, Error> {

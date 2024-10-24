@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
@@ -7,6 +7,9 @@ pub struct Cli {
     // Nested layer of optional subcommands
     #[command(subcommand)]
     pub command: Option<Commands>,
+
+    #[arg(long, action = ArgAction::SetTrue, hide = true)]
+    pub remote: bool,
 }
 
 #[derive(Subcommand, Debug)]
