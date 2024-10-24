@@ -31,6 +31,23 @@ pub trait Modify {
     ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 }
 
+async fn update_mods_in_input(input_mods: Vec<Mod>) -> Result<(), Error> {
+    let new_mod_json = (verify_repo().is_ok()).then(|| {
+        serde_json::to_string(&input_mods.clone()).expect("`Vec<Mod>` is always ok to stringify")
+    });
+    let updated = Input::from(VARS.get().expect("set on startup"), input_mods);
+    write(updated, INPUT_PATH)?;
+
+    if let Some(new_variable) = new_mod_json {
+        if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
+            println!("{INPUT_PATH} updated locally");
+            return Err(err);
+        }
+    }
+
+    Ok(())
+}
+
 impl Modify for Vec<Mod> {
     async fn add_mod(mut self, details: Mod) -> Result<(), Error> {
         if self.contains(&details) {
@@ -41,18 +58,7 @@ impl Modify for Vec<Mod> {
         } else {
             self.push(details);
 
-            let new_mod_json = (verify_repo().is_ok()).then(|| {
-                serde_json::to_string(&self.clone()).expect("`Vec<Mod>` is always ok to stringify")
-            });
-            let updated = Input::from(VARS.get().expect("set on startup"), self);
-            write(updated, INPUT_PATH)?;
-
-            if let Some(new_variable) = new_mod_json {
-                if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
-                    println!("Mod updated locally");
-                    return Err(err);
-                }
-            }
+            update_mods_in_input(self).await?;
 
             println!("Mod Registered!");
             Ok(())
@@ -63,18 +69,7 @@ impl Modify for Vec<Mod> {
         if let Some(i) = self.iter().position(|mod_details| *mod_details == details) {
             self.swap_remove(i);
 
-            let new_mod_json = (verify_repo().is_ok()).then(|| {
-                serde_json::to_string(&self.clone()).expect("`Vec<Mod>` is always ok to stringify")
-            });
-            let updated = Input::from(VARS.get().expect("set on startup"), self);
-            write(updated, INPUT_PATH)?;
-
-            if let Some(new_variable) = new_mod_json {
-                if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
-                    println!("Mod updated locally");
-                    return Err(err);
-                }
-            }
+            update_mods_in_input(self).await?;
 
             println!("Mod removed!");
             Ok(())
