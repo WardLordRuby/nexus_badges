@@ -1,6 +1,6 @@
 use crate::{
     models::{cli::Mod, error::Error, json_data::ModDetails},
-    verify_added, verify_nexus, write, INPUT_PATH, OUPUT_PATH, VARS,
+    verify_added, verify_nexus, write, INPUT_PATH, OK_RESPONSE, OUPUT_PATH, VARS,
 };
 use std::{
     collections::BTreeMap,
@@ -9,8 +9,6 @@ use std::{
 use tokio::task::JoinSet;
 
 const NEXUS_BASE_URL: &str = "https://api.nexusmods.com";
-
-const NEXUS_INFO_OK: u16 = 200;
 
 impl Mod {
     fn get_info_endpoint(&self) -> String {
@@ -79,7 +77,7 @@ async fn try_get_info(details: Mod, client: reqwest::Client) -> Result<ModDetail
         .send()
         .await?;
 
-    if server_response.status() != NEXUS_INFO_OK {
+    if server_response.status() != OK_RESPONSE {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 

@@ -37,6 +37,10 @@ const ENV_NAME_GIT: &str = "GIT_TOKEN";
 const ENV_NAME_GIST_ID: &str = "GIST_ID";
 const ENV_NAME_MODS: &str = "TRACKED_MODS";
 
+pub const OK_RESPONSE: u16 = 200;
+pub const CREATED_RESPONSE: u16 = 201;
+pub const UPDATED_RESPONSE: u16 = 204;
+
 const VERSION_URL: &str =
     "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw/";
 

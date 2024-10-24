@@ -5,11 +5,14 @@ use crate::{
         json_data::Input,
     },
     services::{
-        git::{create_remote, get_public_key, set_repository_secret, update_remote},
+        git::{
+            create_remote, get_public_key, set_repository_secret, set_repository_variable,
+            update_remote,
+        },
         nexus::update_download_counts,
     },
-    verify_gist, verify_git, verify_repo, write, write_badges, ENV_NAME_GIT, ENV_NAME_NEXUS,
-    INPUT_PATH, VARS,
+    verify_gist, verify_git, verify_repo, write, write_badges, ENV_NAME_GIST_ID, ENV_NAME_GIT,
+    ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, VARS,
 };
 use std::{
     io::{self, ErrorKind},
@@ -17,13 +20,19 @@ use std::{
 };
 use tokio::task::JoinSet;
 
+// MARK: TODO
+// Build on multiple targets
+
 pub trait Modify {
-    fn add_mod(self, details: Mod) -> Result<(), Error>;
-    fn remove_mod(self, details: Mod) -> Result<(), Error>;
+    fn add_mod(self, details: Mod) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+    fn remove_mod(
+        self,
+        details: Mod,
+    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 }
 
 impl Modify for Vec<Mod> {
-    fn add_mod(mut self, details: Mod) -> Result<(), Error> {
+    async fn add_mod(mut self, details: Mod) -> Result<(), Error> {
         if self.contains(&details) {
             Err(Error::Io(io::Error::new(
                 ErrorKind::InvalidInput,
@@ -31,18 +40,42 @@ impl Modify for Vec<Mod> {
             )))
         } else {
             self.push(details);
+
+            let new_mod_json = (verify_repo().is_ok()).then(|| {
+                serde_json::to_string(&self.clone()).expect("`Vec<Mod>` is always ok to stringify")
+            });
             let updated = Input::from(VARS.get().expect("set on startup"), self);
             write(updated, INPUT_PATH)?;
+
+            if let Some(new_variable) = new_mod_json {
+                if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
+                    println!("Mod updated locally");
+                    return Err(err);
+                }
+            }
+
             println!("Mod Registered!");
             Ok(())
         }
     }
 
-    fn remove_mod(mut self, details: Mod) -> Result<(), Error> {
+    async fn remove_mod(mut self, details: Mod) -> Result<(), Error> {
         if let Some(i) = self.iter().position(|mod_details| *mod_details == details) {
             self.swap_remove(i);
+
+            let new_mod_json = (verify_repo().is_ok()).then(|| {
+                serde_json::to_string(&self.clone()).expect("`Vec<Mod>` is always ok to stringify")
+            });
             let updated = Input::from(VARS.get().expect("set on startup"), self);
             write(updated, INPUT_PATH)?;
+
+            if let Some(new_variable) = new_mod_json {
+                if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
+                    println!("Mod updated locally");
+                    return Err(err);
+                }
+            }
+
             println!("Mod removed!");
             Ok(())
         } else {
@@ -55,23 +88,28 @@ impl Modify for Vec<Mod> {
 }
 
 pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), Error> {
+    macro_rules! clone_if {
+        ($condition:expr, $target:ident, $value:expr) => {
+            if $condition {
+                $target = Some($value.clone());
+            }
+        };
+    }
+
     let mut curr = Input::from(VARS.get().expect("set on startup"), input_mods);
-    let try_update_secrets = verify_repo().is_ok();
-    let (mut new_git_token, mut new_nexus_key) = (None, None);
+    let try_update_remote_env = verify_repo().is_ok();
+    let (mut new_git_token, mut new_nexus_key, mut new_gist_id) = (None, None, None);
 
     if let Some(token) = new.git {
-        if try_update_secrets {
-            new_git_token = Some(token.clone());
-        }
+        clone_if!(try_update_remote_env, new_git_token, token);
         curr.git_token = token;
     }
     if let Some(key) = new.nexus {
-        if try_update_secrets {
-            new_nexus_key = Some(key.clone());
-        }
+        clone_if!(try_update_remote_env, new_nexus_key, key);
         curr.nexus_key = key;
     }
     if let Some(ref mut id) = new.gist {
+        clone_if!(try_update_remote_env, new_gist_id, id);
         std::mem::swap(&mut curr.gist_id, id);
     }
     if let Some(repo) = new.repo {
@@ -93,9 +131,9 @@ pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), E
 
     println!("Key(s) updated locally");
 
-    // MARK: TODO
-    // add mods & gist_id
-    if try_update_secrets && (new_git_token.is_some() || new_nexus_key.is_some()) {
+    if try_update_remote_env
+        && (new_git_token.is_some() || new_nexus_key.is_some() || new_gist_id.is_some())
+    {
         let public_key = get_public_key().await.map_or_else(
             |err| {
                 eprintln!("{err}");
@@ -118,6 +156,9 @@ pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), E
                 tasks.spawn(async move {
                     set_repository_secret(ENV_NAME_NEXUS, &secret, &key_arc).await
                 });
+            }
+            if let Some(id) = new_gist_id {
+                tasks.spawn(async move { set_repository_variable(ENV_NAME_GIST_ID, &id).await });
             }
         }
 
@@ -175,21 +216,42 @@ pub async fn init_remote(input_mods: Vec<Mod>) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn init_actions(_input_mods: Vec<Mod>) -> Result<(), Error> {
+pub async fn init_actions(input_mods: Vec<Mod>) -> Result<(), Error> {
+    update_remote_variables(input_mods).await?;
+
+    // MARK: TODO
+    // update_action_workflow().await?;
+
+    Ok(())
+}
+
+async fn update_remote_variables(input_mods: Vec<Mod>) -> Result<(), Error> {
     verify_repo()?;
 
-    let public_key = get_public_key().await?;
     let vars = VARS.get().expect("set on startup");
-    let (res1, res2) = tokio::join!(
+    let mods_str =
+        serde_json::to_string(&input_mods).expect("`Vec<Mod>` is always ok to stringify");
+    let (public_key_res, gist_id_res, input_mods_res) = tokio::join!(
+        get_public_key(),
+        set_repository_variable(ENV_NAME_GIST_ID, &vars.gist_id),
+        set_repository_variable(ENV_NAME_MODS, &mods_str)
+    );
+
+    gist_id_res?;
+    input_mods_res?;
+    let public_key = public_key_res?;
+
+    let (git_secret_res, nexus_secret_res) = tokio::join!(
         set_repository_secret(ENV_NAME_GIT, &vars.git_token, &public_key),
         set_repository_secret(ENV_NAME_NEXUS, &vars.nexus_key, &public_key)
     );
 
-    res1?;
-    res2?;
-    // MARK: TODO's
-    // 1. Commit (non-sensitive) input.json
-    // 2. Upload and schedule Action Workflow
-    // 3. Build on multiple targets
+    git_secret_res?;
+    nexus_secret_res?;
+
     Ok(())
+}
+
+async fn update_action_workflow() -> Result<(), Error> {
+    todo!()
 }

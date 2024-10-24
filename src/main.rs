@@ -26,9 +26,11 @@ async fn main() {
                 .unwrap_or_else(|err| eprintln!("{err}")),
             Commands::Add(details) => input_mods
                 .add_mod(details)
+                .await
                 .unwrap_or_else(|err| eprintln!("{err}")),
             Commands::Remove(details) => input_mods
                 .remove_mod(details)
+                .await
                 .unwrap_or_else(|err| eprintln!("{err}")),
             Commands::Init => init_remote(input_mods)
                 .await

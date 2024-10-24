@@ -3,7 +3,7 @@ use crate::{
         error::Error,
         json_data::{FileDetails, GistResponse, RepositoryPublicKey},
     },
-    VARS,
+    CREATED_RESPONSE, OK_RESPONSE, UPDATED_RESPONSE, VARS,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use crypto_box::{aead::OsRng, PublicKey};
@@ -20,13 +20,6 @@ const GIST_NAME: &str = "nexus_badges.json";
 const GIST_DESC: &str = "Private gist to be used as a json endpoint for badge download counters";
 
 const RAW: &str = "/raw/";
-
-const GIT_PUBLIC_KEY_OK: u16 = 200;
-const GIT_SECRET_CREATED: u16 = 201;
-const GIT_SECRET_UPDATED: u16 = 204;
-const GIST_GET_OK: u16 = 200;
-const GIST_UPDATE_OK: u16 = 200;
-const GIST_CREATED: u16 = 201;
 
 impl GistResponse {
     fn file_details(&self) -> Result<&FileDetails, Error> {
@@ -76,6 +69,22 @@ fn repository_secret_endpoint(secret_name: &str) -> String {
     )
 }
 
+fn repository_variables_endpoint() -> String {
+    let vars = VARS.get().expect("set on startup");
+    format!(
+        "{GIT_BASE_URL}/repos/{}/{}/actions/variables",
+        vars.owner, vars.repo
+    )
+}
+
+fn repository_variable_endpoint(var: &str) -> String {
+    let vars = VARS.get().expect("set on startup");
+    format!(
+        "{GIT_BASE_URL}/repos/{}/{}/actions/variables/{var}",
+        vars.owner, vars.repo
+    )
+}
+
 fn git_token_h_key() -> String {
     format!("Bearer {}", VARS.get().expect("set on startup").git_token)
 }
@@ -91,11 +100,42 @@ fn git_header() -> reqwest::header::HeaderMap {
     .fold(HeaderMap::new(), |mut map, (key, cow)| {
         let val = match cow {
             Cow::Borrowed(b) => HeaderValue::from_static(b),
-            Cow::Owned(o) => HeaderValue::from_str(&o).expect("git token produces valid key"),
+            Cow::Owned(o) => {
+                HeaderValue::from_str(&o).expect("`git_token_h_key` produces valid key")
+            }
         };
-        assert!(map.insert(key, val).is_none());
+        map.insert(key, val);
         map
     })
+}
+
+pub async fn set_repository_variable(name: &str, value: &str) -> Result<(), Error> {
+    let build = |request: reqwest::RequestBuilder| {
+        request
+            .headers(git_header())
+            .json(&serde_json::json!({
+                "name": name,
+                "value": value,
+            }))
+            .send()
+    };
+    let update_request = reqwest::Client::new().patch(repository_variable_endpoint(name));
+    let update_response = build(update_request).await?;
+
+    if update_response.status() != UPDATED_RESPONSE {
+        let create_request = reqwest::Client::new().post(repository_variables_endpoint());
+        let create_response = build(create_request).await?;
+
+        if create_response.status() != CREATED_RESPONSE {
+            return Err(Error::BadResponse(create_response.text().await?));
+        }
+
+        println!("Repository variable: {name}, created");
+        return Ok(());
+    }
+
+    println!("Repository variable: {name}, updated");
+    Ok(())
 }
 
 pub async fn create_remote(content: String) -> Result<GistResponse, Error> {
@@ -114,7 +154,7 @@ pub async fn create_remote(content: String) -> Result<GistResponse, Error> {
         .send()
         .await?;
 
-    if server_response.status() != GIST_CREATED {
+    if server_response.status() != CREATED_RESPONSE {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -140,7 +180,7 @@ pub async fn update_remote(gist_endpoint: &str, content: String) -> Result<GistR
         .send()
         .await?;
 
-    if server_response.status() != GIST_UPDATE_OK {
+    if server_response.status() != OK_RESPONSE {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -159,7 +199,7 @@ pub async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Error> {
         .send()
         .await?;
 
-    if server_response.status() != GIST_GET_OK {
+    if server_response.status() != OK_RESPONSE {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -176,7 +216,7 @@ pub async fn get_public_key() -> Result<RepositoryPublicKey, Error> {
         .send()
         .await?;
 
-    if server_response.status() != GIT_PUBLIC_KEY_OK {
+    if server_response.status() != OK_RESPONSE {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -203,14 +243,13 @@ pub async fn set_repository_secret(
         .send()
         .await?;
 
-    if server_response.status() == GIT_SECRET_CREATED
-        || server_response.status() == GIT_SECRET_UPDATED
+    if server_response.status() == CREATED_RESPONSE || server_response.status() == UPDATED_RESPONSE
     {
         println!(
             "Repository secret: {secret_name}, {}",
             match server_response.status() {
-                s if s == GIT_SECRET_CREATED => "created",
-                s if s == GIT_SECRET_UPDATED => "updated",
+                s if s == CREATED_RESPONSE => "created",
+                s if s == UPDATED_RESPONSE => "updated",
                 _ => unreachable!("by outer if"),
             }
         );
