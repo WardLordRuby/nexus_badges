@@ -211,13 +211,15 @@ impl Input {
 }
 
 pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
-    tokio::task::spawn(async {
-        match check_program_version().await {
-            Ok(Some(msg)) => println!("{msg}"),
-            Ok(None) => (),
-            Err(err) => eprintln!("{err}"),
-        }
-    });
+    if !on_remote {
+        tokio::task::spawn(async {
+            match check_program_version().await {
+                Ok(Some(msg)) => println!("{msg}"),
+                Ok(None) => (),
+                Err(err) => eprintln!("{err}"),
+            }
+        });
+    }
 
     if !std::fs::exists(IO_DIR)? {
         std::fs::create_dir(IO_DIR)?;

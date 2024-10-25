@@ -1,4 +1,4 @@
-name: Update Nexus Mods download counts
+name: Update download counts
 
 on:
   schedule:
@@ -9,10 +9,39 @@ jobs:
   run-binary:
     runs-on: ubuntu-latest
     steps:
-      - name: Download latest binary
-        run: wget "https://github.com/WardLordRuby/nexus_badges/releases/latest/download/{asset-name}" -O ./nexus-mods.gz
+      - name: Restore cached binary
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ./nexus-mods.gz
+          key: ${{ runner.os }}-nexus-badges-binary
 
       - name: Decompress binary
+        if: steps.cache.outputs.cache-hit
+        run: gunzip -f ./nexus-mods.gz
+
+      - name: Check for update
+        id: check_ver
+        if: steps.cache.outputs.cache-hit
+        continue-on-error: true
+        run: |
+          chmod +x ./nexus-mods
+          ./nexus-mods --remote version
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Download latest binary
+        if: ${{ !steps.cache.outputs.cache-hit || steps.check_ver.outputs.exit_code == '70' }}
+        run: wget "https://drive.google.com/uc?export=download&id=1yHF8B0YynKglsOOsGAb5VXzOCAsCKW5o" -O ./nexus-mods.gz
+
+      - name: Cache up-to-date binary
+        if: ${{ !steps.cache.outputs.cache-hit || steps.check_ver.outputs.exit_code == '70' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ./nexus-mods.gz
+          key: ${{ runner.os }}-nexus-badges-binary
+
+      - name: Decompress binary
+        if: ${{ !steps.cache.outputs.cache-hit || steps.check_ver.outputs.exit_code == '70' }}
         run: gunzip -f ./nexus-mods.gz
 
       - name: Run binary
