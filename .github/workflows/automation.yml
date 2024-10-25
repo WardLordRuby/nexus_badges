@@ -1,0 +1,19 @@
+name: Update Nexus Mods download counts
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs at 00:00 UTC every day
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  run-binary:
+    runs-on: ubuntu-latest
+    steps:
+      # wget https://github.com/WardLordRuby/nexus_badges/releases/latest/download/{asset-name} -O ./binary
+      - name: Download latest binary
+        run: |
+          wget https://drive.google.com/uc?export=download&id=1yHF8B0YynKglsOOsGAb5VXzOCAsCKW5o -O ./nexus-mods
+          chmod +x ./nexus-mods
+
+      - name: Run binary
+        run: ./nexus-mods.exe --remote
