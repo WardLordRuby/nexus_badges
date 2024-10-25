@@ -11,7 +11,7 @@ pub mod services {
 
 use crate::{
     models::{
-        cli::Mod,
+        cli::{Commands, Mod},
         error::Error,
         json_data::{GistResponse, Input, ModDetails, Version},
     },
@@ -21,6 +21,7 @@ use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
+    fmt::Display,
     fs::File,
     io::{BufRead, BufReader, ErrorKind, Write},
     sync::OnceLock,
@@ -45,6 +46,34 @@ const VERSION_URL: &str =
     "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw/";
 
 static VARS: OnceLock<StartupVars> = OnceLock::new();
+
+#[macro_export]
+macro_rules! remote_unsupported {
+    ($remote:expr, $command:ident) => {
+        if $remote {
+            eprintln!("'{}' is not supported on remote", $command);
+            return;
+        }
+    };
+}
+
+impl Display for Commands {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Commands::Add(_) => "add",
+                Commands::Remove(_) => "remove",
+                Commands::SetArg(_) => "set-arg",
+                Commands::Automation { state: _ } => "automation",
+                Commands::Init => "init",
+                Commands::InitActions => "init-actions",
+                Commands::Version => "version",
+            }
+        )
+    }
+}
 
 impl ModDetails {
     fn add_url(mut self, from: &Mod) -> Self {
@@ -113,12 +142,12 @@ fn verify_repo() -> Result<(), Error> {
     Ok(())
 }
 
-async fn check_program_version() -> reqwest::Result<()> {
+async fn check_program_version() -> reqwest::Result<Option<String>> {
     let version = reqwest::get(VERSION_URL).await?.json::<Version>().await?;
     if version.latest != env!("CARGO_PKG_VERSION") {
-        println!("{}", version.message);
+        return Ok(Some(version.message));
     }
-    Ok(())
+    Ok(None)
 }
 
 #[derive(Debug)]
@@ -182,7 +211,13 @@ impl Input {
 }
 
 pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
-    tokio::task::spawn(check_program_version());
+    tokio::task::spawn(async {
+        match check_program_version().await {
+            Ok(Some(msg)) => println!("{msg}"),
+            Ok(None) => (),
+            Err(err) => eprintln!("{err}"),
+        }
+    });
 
     if !std::fs::exists(IO_DIR)? {
         std::fs::create_dir(IO_DIR)?;

@@ -2,7 +2,6 @@ use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
-#[command(version)]
 pub struct Cli {
     // Nested layer of optional subcommands
     #[command(subcommand)]
@@ -35,6 +34,9 @@ pub enum Commands {
         #[arg(value_enum)]
         state: Workflow,
     },
+
+    /// Display current version
+    Version,
 }
 
 #[derive(Args, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]

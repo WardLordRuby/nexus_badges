@@ -1,4 +1,5 @@
 use crate::{
+    check_program_version,
     models::{
         cli::{Mod, SetArgs, Workflow},
         error::Error,
@@ -19,6 +20,25 @@ use std::{
     sync::Arc,
 };
 use tokio::task::JoinSet;
+
+pub async fn version(on_remote: bool) -> reqwest::Result<()> {
+    let ver_res = check_program_version().await;
+    if on_remote {
+        match ver_res {
+            Ok(Some(_)) => std::process::exit(70),
+            Ok(None) => std::process::exit(0),
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(20)
+            }
+        }
+    }
+    println!("nexus_mods v{}", env!("CARGO_PKG_VERSION"));
+    if let Some(msg) = ver_res? {
+        println!("{msg}")
+    }
+    Ok(())
+}
 
 pub trait Modify {
     fn add_mod(self, details: Mod) -> impl std::future::Future<Output = Result<(), Error>> + Send;
