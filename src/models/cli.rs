@@ -20,7 +20,7 @@ pub enum Commands {
     /// Remove mod from input data
     Remove(Mod),
 
-    /// Input Private keys to be stored locally (or uploaded as Repository secrets)
+    /// Configure necessary credentials for NexusMod and Git API calls
     #[command(alias = "set")]
     SetArg(SetArgs),
 
@@ -51,7 +51,9 @@ pub struct Mod {
 #[derive(Args, Debug)]
 #[group(multiple = true, required = true)]
 pub struct SetArgs {
-    /// Github fine-grained private token (with r/w permission for gists)
+    /// Github fine-grained private token with read/write permissions for gists
+    /// {n}  [Additional permissions are required for automation via GitHub actions
+    /// {n}  refer to documentation at https://github.com/WardLordRuby/nexus_badges]
     #[arg(long, alias = "git-token")]
     pub git: Option<String>,
 
@@ -63,13 +65,12 @@ pub struct SetArgs {
     #[arg(long, alias = "gist-id")]
     pub gist: Option<String>,
 
-    /// Your GitHub user name
-    /// {n}  (Required for GitHub actions setup)
+    /// Your GitHub user name [Required for GitHub actions setup]
     #[arg(long)]
     pub owner: Option<String>,
 
-    /// Name of your forked repository to 'nexus_badges' without the .git extension
-    /// {n}  (Required for GitHub actions setup)
+    /// Name of your forked repository of 'nexus_badges' without the .git extension
+    /// {n}  [Required for GitHub actions setup]
     #[arg(long)]
     pub repo: Option<String>,
 }

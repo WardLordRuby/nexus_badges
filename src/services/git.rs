@@ -4,7 +4,7 @@ use crate::{
         error::Error,
         json_data::{FileDetails, GistResponse, RepositoryPublicKey},
     },
-    CREATED_RESPONSE, OK_RESPONSE, UPDATED_RESPONSE, VARS,
+    verify_repo, CREATED_RESPONSE, OK_RESPONSE, UPDATED_RESPONSE, VARS,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use crypto_box::{aead::OsRng, PublicKey};
@@ -134,6 +134,8 @@ fn git_header() -> reqwest::header::HeaderMap {
 }
 
 pub async fn set_workflow_state(state: Workflow) -> Result<(), Error> {
+    verify_repo()?;
+
     let server_response = reqwest::Client::new()
         .put(workflow_endpoint_state(state))
         .headers(git_header())
