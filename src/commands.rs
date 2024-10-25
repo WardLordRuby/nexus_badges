@@ -1,13 +1,13 @@
 use crate::{
     models::{
-        cli::{Mod, SetArgs},
+        cli::{Mod, SetArgs, Workflow},
         error::Error,
         json_data::Input,
     },
     services::{
         git::{
             create_remote, get_public_key, set_repository_secret, set_repository_variable,
-            update_remote,
+            set_workflow_state, update_remote,
         },
         nexus::update_download_counts,
     },
@@ -19,9 +19,6 @@ use std::{
     sync::Arc,
 };
 use tokio::task::JoinSet;
-
-// MARK: TODO
-// Build on multiple targets
 
 pub trait Modify {
     fn add_mod(self, details: Mod) -> impl std::future::Future<Output = Result<(), Error>> + Send;
@@ -82,15 +79,15 @@ impl Modify for Vec<Mod> {
     }
 }
 
-pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), Error> {
-    macro_rules! clone_if {
-        ($condition:expr, $target:ident, $value:expr) => {
-            if $condition {
-                $target = Some($value.clone());
-            }
-        };
-    }
+macro_rules! clone_if {
+    ($condition:expr, $target:ident, $value:expr) => {
+        if $condition {
+            $target = Some($value.clone());
+        }
+    };
+}
 
+pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), Error> {
     let mut curr = Input::from(VARS.get().expect("set on startup"), input_mods);
     let try_update_remote_env = verify_repo().is_ok();
     let (mut new_git_token, mut new_nexus_key, mut new_gist_id) = (None, None, None);
@@ -152,9 +149,9 @@ pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), E
                     set_repository_secret(ENV_NAME_NEXUS, &secret, &key_arc).await
                 });
             }
-            if let Some(id) = new_gist_id {
-                tasks.spawn(async move { set_repository_variable(ENV_NAME_GIST_ID, &id).await });
-            }
+        }
+        if let Some(id) = new_gist_id {
+            tasks.spawn(async move { set_repository_variable(ENV_NAME_GIST_ID, &id).await });
         }
 
         while let Some(res) = tasks.join_next().await {
@@ -167,8 +164,9 @@ pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), E
     Ok(())
 }
 
-pub async fn process(input_mods: Vec<Mod>) -> Result<(), Error> {
-    let (output_res, verify_res) = tokio::join!(update_download_counts(input_mods), verify_gist());
+pub async fn process(input_mods: Vec<Mod>, on_remote: bool) -> Result<(), Error> {
+    let (output_res, verify_res) =
+        tokio::join!(update_download_counts(input_mods, on_remote), verify_gist());
 
     let (gist_endpoint, prev_remote) = verify_res?;
     let output = output_res?;
@@ -183,15 +181,17 @@ pub async fn process(input_mods: Vec<Mod>) -> Result<(), Error> {
         );
     }
 
-    let universal_url = prev_remote.universal_url()?;
-
-    write_badges(output, universal_url)
+    if !on_remote {
+        let universal_url = prev_remote.universal_url()?;
+        write_badges(output, universal_url)?;
+    }
+    Ok(())
 }
 
 pub async fn init_remote(input_mods: Vec<Mod>) -> Result<(), Error> {
     verify_git()?;
     let mut input = Input::from(VARS.get().expect("set on startup"), input_mods.clone());
-    let output = update_download_counts(input_mods).await?;
+    let output = update_download_counts(input_mods, false).await?;
 
     let mut meta = create_remote(serde_json::to_string_pretty(&output)?).await?;
 
@@ -213,10 +213,7 @@ pub async fn init_remote(input_mods: Vec<Mod>) -> Result<(), Error> {
 
 pub async fn init_actions(input_mods: Vec<Mod>) -> Result<(), Error> {
     update_remote_variables(input_mods).await?;
-
-    // MARK: TODO
-    // update_action_workflow().await?;
-
+    set_workflow_state(Workflow::Enable).await?;
     Ok(())
 }
 
@@ -245,8 +242,4 @@ async fn update_remote_variables(input_mods: Vec<Mod>) -> Result<(), Error> {
     nexus_secret_res?;
 
     Ok(())
-}
-
-async fn update_action_workflow() -> Result<(), Error> {
-    todo!()
 }

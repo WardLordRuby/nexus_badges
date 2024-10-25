@@ -9,11 +9,18 @@ jobs:
   run-binary:
     runs-on: ubuntu-latest
     steps:
-      # wget https://github.com/WardLordRuby/nexus_badges/releases/latest/download/{asset-name} -O ./binary
       - name: Download latest binary
-        run: |
-          wget https://drive.google.com/uc?export=download&id=1yHF8B0YynKglsOOsGAb5VXzOCAsCKW5o -O ./nexus-mods
-          chmod +x ./nexus-mods
+        run: wget "https://github.com/WardLordRuby/nexus_badges/releases/latest/download/{asset-name}" -O ./nexus-mods.gz
+
+      - name: Decompress binary
+        run: gunzip -f ./nexus-mods.gz
 
       - name: Run binary
-        run: ./nexus-mods.exe --remote
+        env:
+          NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+          GIST_ID: ${{ vars.GIST_ID }}
+          TRACKED_MODS: ${{ vars.TRACKED_MODS }}
+        run: |
+          chmod +x ./nexus-mods
+          ./nexus-mods --remote

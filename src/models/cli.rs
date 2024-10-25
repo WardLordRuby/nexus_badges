@@ -1,4 +1,4 @@
-use clap::{ArgAction, Args, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
@@ -29,6 +29,12 @@ pub enum Commands {
 
     /// Initalize GitHub actions to run the binary at scheduled times
     InitActions,
+
+    /// Set the state for download counter automation via GitHub actions
+    Automation {
+        #[arg(value_enum)]
+        state: Workflow,
+    },
 }
 
 #[derive(Args, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
@@ -66,4 +72,10 @@ pub struct SetArgs {
     /// {n}  (Required for GitHub actions setup)
     #[arg(long)]
     pub repo: Option<String>,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum Workflow {
+    Enable,
+    Disable,
 }

@@ -1,5 +1,6 @@
 use crate::{
     models::{
+        cli::Workflow,
         error::Error,
         json_data::{FileDetails, GistResponse, RepositoryPublicKey},
     },
@@ -10,6 +11,7 @@ use crypto_box::{aead::OsRng, PublicKey};
 use reqwest::header::{HeaderMap, HeaderValue};
 use std::{
     borrow::Cow,
+    fmt::Display,
     io::{self, ErrorKind},
 };
 
@@ -19,6 +21,7 @@ const GIT_API_VER: &str = "2022-11-28";
 const GIST_NAME: &str = "nexus_badges.json";
 const GIST_DESC: &str = "Private gist to be used as a json endpoint for badge download counters";
 
+const WORKFLOW_NAME: &str = "automation.yml";
 const RAW: &str = "/raw/";
 
 impl GistResponse {
@@ -85,6 +88,27 @@ fn repository_variable_endpoint(var: &str) -> String {
     )
 }
 
+fn workflow_endpoint_state(state: Workflow) -> String {
+    let vars = VARS.get().expect("set on startup");
+    format!(
+        "{GIT_BASE_URL}/repos/{}/{}/actions/workflows/{WORKFLOW_NAME}/{state}",
+        vars.owner, vars.repo
+    )
+}
+
+impl Display for Workflow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Workflow::Enable => "enable",
+                Workflow::Disable => "disable",
+            }
+        )
+    }
+}
+
 fn git_token_h_key() -> String {
     format!("Bearer {}", VARS.get().expect("set on startup").git_token)
 }
@@ -109,6 +133,21 @@ fn git_header() -> reqwest::header::HeaderMap {
     })
 }
 
+pub async fn set_workflow_state(state: Workflow) -> Result<(), Error> {
+    let server_response = reqwest::Client::new()
+        .put(workflow_endpoint_state(state))
+        .headers(git_header())
+        .send()
+        .await?;
+
+    if server_response.status() != UPDATED_RESPONSE {
+        return Err(Error::BadResponse(server_response.text().await?));
+    }
+
+    println!("GitHub automation workflow: {state}d");
+    Ok(())
+}
+
 pub async fn set_repository_variable(name: &str, value: &str) -> Result<(), Error> {
     let build = |request: reqwest::RequestBuilder| {
         request
@@ -122,20 +161,20 @@ pub async fn set_repository_variable(name: &str, value: &str) -> Result<(), Erro
     let update_request = reqwest::Client::new().patch(repository_variable_endpoint(name));
     let update_response = build(update_request).await?;
 
-    if update_response.status() != UPDATED_RESPONSE {
-        let create_request = reqwest::Client::new().post(repository_variables_endpoint());
-        let create_response = build(create_request).await?;
+    if update_response.status() == UPDATED_RESPONSE {
+        println!("Repository variable: {name}, updated");
+        return Ok(());
+    }
 
-        if create_response.status() != CREATED_RESPONSE {
-            return Err(Error::BadResponse(create_response.text().await?));
-        }
+    let create_request = reqwest::Client::new().post(repository_variables_endpoint());
+    let create_response = build(create_request).await?;
 
+    if create_response.status() == CREATED_RESPONSE {
         println!("Repository variable: {name}, created");
         return Ok(());
     }
 
-    println!("Repository variable: {name}, updated");
-    Ok(())
+    Err(Error::BadResponse(create_response.text().await?))
 }
 
 pub async fn create_remote(content: String) -> Result<GistResponse, Error> {

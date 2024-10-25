@@ -25,7 +25,10 @@ impl Mod {
     }
 }
 
-pub async fn update_download_counts(mods: Vec<Mod>) -> Result<BTreeMap<u64, ModDetails>, Error> {
+pub async fn update_download_counts(
+    mods: Vec<Mod>,
+    on_remote: bool,
+) -> Result<BTreeMap<u64, ModDetails>, Error> {
     verify_nexus()?;
     verify_added(&mods)?;
 
@@ -59,12 +62,12 @@ pub async fn update_download_counts(mods: Vec<Mod>) -> Result<BTreeMap<u64, ModD
         }
     }
 
-    write(output.clone(), OUPUT_PATH)?;
+    println!("Retrieved download counts from Nexus Mods");
 
-    println!(
-        "Retrieved and saved locally download counts for {} mod(s)",
-        output.len()
-    );
+    if !on_remote {
+        write(output.clone(), OUPUT_PATH)?;
+        println!("Download counts saved locally for {} mod(s)", output.len());
+    }
 
     Ok(output)
 }
