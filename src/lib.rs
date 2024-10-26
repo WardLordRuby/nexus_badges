@@ -48,10 +48,17 @@ const VERSION_URL: &str =
 static VARS: OnceLock<StartupVars> = OnceLock::new();
 
 #[macro_export]
-macro_rules! remote_unsupported {
-    ($remote:expr, $command:ident) => {
+macro_rules! unsupported {
+    ($command:ident, on_remote, $remote:expr) => {
         if $remote {
             eprintln!("'{}' is not supported on remote", $command);
+            return;
+        }
+    };
+
+    ($command:ident, on_local, $remote:expr) => {
+        if !$remote {
+            eprintln!("'{}' is only supported on remote", $command);
             return;
         }
     };
@@ -70,6 +77,7 @@ impl Display for Commands {
                 Commands::Init => "init",
                 Commands::InitActions => "init-actions",
                 Commands::Version => "version",
+                Commands::RepoVariable { key: _, val: _ } => "repo-variable",
             }
         )
     }
@@ -150,13 +158,31 @@ async fn check_program_version() -> reqwest::Result<Option<String>> {
     Ok(None)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StartupVars {
     nexus_key: String,
     git_token: String,
     gist_id: String,
     owner: String,
     repo: String,
+}
+
+impl StartupVars {
+    /// NOTE: this method is not supported on local
+    pub fn git_api_only() -> Result<Self, Error> {
+        const ENV_NAME_REPO: &str = "REPO_FULL";
+
+        let (owner, repo) = std::env::var(ENV_NAME_REPO)?
+            .split_once('/')
+            .map(|(owner, repo)| (owner.to_string(), repo.to_string()))
+            .expect("'github.repository' is always formatted with a '/'");
+        Ok(StartupVars {
+            git_token: std::env::var(ENV_NAME_GIT)?,
+            owner,
+            repo,
+            ..Default::default()
+        })
+    }
 }
 
 impl From<&mut Input> for StartupVars {
@@ -265,11 +291,13 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
     Ok(())
 }
 
-pub fn await_user_for_end() {
-    println!("Press enter to exit...");
-    let stdin = std::io::stdin();
-    let mut reader = BufReader::new(stdin);
-    let _ = reader.read_line(&mut String::new());
+pub fn await_user_for_end(on_remote: bool) {
+    if !on_remote {
+        println!("Press enter to exit...");
+        let stdin = std::io::stdin();
+        let mut reader = BufReader::new(stdin);
+        let _ = reader.read_line(&mut String::new());
+    }
 }
 
 const CUSTOM_ENCODE_SET: &AsciiSet = &CONTROLS

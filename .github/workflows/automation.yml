@@ -8,6 +8,9 @@ on:
 jobs:
   update-remote-gist:
     runs-on: ubuntu-latest
+    env:
+      GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
+
     steps:
       - name: Restore cached binary
         id: cache
@@ -17,16 +20,17 @@ jobs:
           path: ./nexus-mods.gz
           key: ${{ vars.CACHED_BIN }}
 
-      - name: Decompress binary
+      - name: Decompress cached binary
         if: steps.cache.outputs.cache-hit
-        run: gunzip -f ./nexus-mods.gz
+        run: |
+          gunzip -f ./nexus-mods.gz
+          chmod +x ./nexus-mods
 
       - name: Check for update
         id: check_ver
         if: steps.cache.outputs.cache-hit
         run: |
           set +e
-          chmod +x ./nexus-mods
           ./nexus-mods --remote version
           echo "exit_code=$?" >> $GITHUB_OUTPUT
 
@@ -38,56 +42,29 @@ jobs:
           wget "https://drive.google.com/uc?export=download&id=1yHF8B0YynKglsOOsGAb5VXzOCAsCKW5o" -O ./nexus-mods.gz
           echo "cache_key_new=${{ runner.os }}-binary-nexus-badges-${{ github.run_id }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
 
-      - name: Cache up-to-date binary
+      - name: Cache latest binary
         if: steps.download_latest.outcome == 'success'
         uses: actions/cache/save@v4
         with:
           path: ./nexus-mods.gz
           key: ${{ steps.download_latest.outputs.cache_key_new }}
 
-      - name: Update Repository Variable
-        id: update_cache_key
+      - name: Decompress latest binary
         if: steps.download_latest.outcome == 'success'
         run: |
-          set +e
-          response=$(curl -s -w "%{http_code}" -X PATCH \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GIT_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/variables/CACHED_BIN \
-            -d '{"name": "CACHED_BIN", "value": "${{ steps.download_latest.outputs.cache_key_new }}"}')
-          status=$(echo "$response" | tail -n 1)
-          if [ "$status" -eq 204 ]; then
-            echo "Updated Repository variable: 'CACHED_BIN'"
-          else
-            echo "HTTP response: $(echo "$response" | head -n -1 | jq -r '.message')"
-          fi
-          echo "status=$status" >> $GITHUB_OUTPUT
+          gunzip -f ./nexus-mods.gz
+          chmod +x ./nexus-mods
 
-      - name: Create Repository Variable
-        if: ${{ steps.update_cache_key.outcome != 'skipped' && steps.update_cache_key.outputs.status != '204' }}
+      - name: Update cache key
+        if: steps.download_latest.outcome == 'success'
         continue-on-error: true
-        run: |
-          response=$(curl -s -w "%{http_code}" -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GIT_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/variables \
-            -d '{"name": "CACHED_BIN", "value": "${{ steps.download_latest.outputs.cache_key_new }}"}')
-          if [ "$(echo "$response" | tail -n 1)" -eq 201 ]; then
-            echo "Created Repository variable: 'CACHED_BIN'"
-          else
-            echo "HTTP response: $(echo "$response" | head -n -1 | jq -r '.message')"
-          fi
-
-      - name: Decompress binary
-        if: steps.download_latest.outcome == 'success'
-        run: gunzip -f ./nexus-mods.gz
+        env:
+          REPO_FULL: ${{ github.repository }}
+        run: ./nexus-mods --remote repo-variable --key CACHED_BIN --val ${{ steps.download_latest.outputs.cache_key_new }}
 
       - name: Run binary
         env:
           NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
-          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           GIST_ID: ${{ vars.GIST_ID }}
           TRACKED_MODS: ${{ vars.TRACKED_MODS }}
-        run: |
-          chmod +x ./nexus-mods
-          ./nexus-mods --remote
+        run: ./nexus-mods --remote

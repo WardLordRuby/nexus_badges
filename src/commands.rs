@@ -12,8 +12,8 @@ use crate::{
         },
         nexus::update_download_counts,
     },
-    verify_gist, verify_git, verify_repo, write, write_badges, ENV_NAME_GIST_ID, ENV_NAME_GIT,
-    ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, VARS,
+    verify_gist, verify_git, verify_repo, write, write_badges, StartupVars, ENV_NAME_GIST_ID,
+    ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, VARS,
 };
 use std::{
     io::{self, ErrorKind},
@@ -268,4 +268,12 @@ async fn update_remote_variables(input_mods: Vec<Mod>) -> Result<(), Error> {
     nexus_secret_res?;
 
     Ok(())
+}
+
+/// NOTE: this command is not supported on local
+pub async fn repo_variable_from_remote(key: &str, val: &str) -> Result<(), Error> {
+    VARS.set(StartupVars::git_api_only()?)
+        .expect("`startup` never gets to run");
+
+    set_repository_variable(key, val).await
 }

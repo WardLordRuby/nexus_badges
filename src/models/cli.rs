@@ -37,6 +37,16 @@ pub enum Commands {
 
     /// Display current version
     Version,
+
+    /// Set/Update a repository variable [Not supported on local]
+    #[command(hide = true)]
+    RepoVariable {
+        #[arg(long)]
+        key: String,
+
+        #[arg(long)]
+        val: String,
+    },
 }
 
 #[derive(Args, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
