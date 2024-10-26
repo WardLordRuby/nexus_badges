@@ -77,7 +77,7 @@ impl Display for Commands {
                 Commands::Init => "init",
                 Commands::InitActions => "init-actions",
                 Commands::Version => "version",
-                Commands::RepoVariable { key: _, val: _ } => "repo-variable",
+                Commands::UpdateCacheKey { old: _, new: _ } => "repo-variable",
             }
         )
     }

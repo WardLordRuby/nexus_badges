@@ -2,7 +2,7 @@ use clap::Parser;
 use nexus_badges::{
     await_user_for_end,
     commands::{
-        init_actions, init_remote, process, repo_variable_from_remote, update_args, version, Modify,
+        init_actions, init_remote, process, update_args, update_cache_key, version, Modify,
     },
     models::cli::{Cli, Commands},
     services::git::set_workflow_state,
@@ -28,14 +28,12 @@ async fn main() {
                     .unwrap_or_else(|err| eprintln!("{err}"));
                 return;
             }
-            Commands::RepoVariable { key, val } => {
+            Commands::UpdateCacheKey { old, new } => {
                 unsupported!(command, on_local, cli.remote);
-                repo_variable_from_remote(key, val)
-                    .await
-                    .unwrap_or_else(|err| {
-                        eprintln!("{err}");
-                        std::process::exit(1)
-                    });
+                update_cache_key(old, new).await.unwrap_or_else(|err| {
+                    eprintln!("{err}");
+                    std::process::exit(1)
+                });
                 return;
             }
             _ => (),
@@ -74,7 +72,7 @@ async fn main() {
             Commands::InitActions => init_actions(input_mods)
                 .await
                 .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::RepoVariable { key: _, val: _ } => unreachable!("by repo-variable guard"),
+            Commands::UpdateCacheKey { old: _, new: _ } => unreachable!("by repo-variable guard"),
             Commands::Automation { state: _ } => unreachable!("by automation guard"),
             Commands::Version => unreachable!("by version guard"),
         }

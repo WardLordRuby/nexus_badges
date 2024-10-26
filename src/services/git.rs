@@ -88,6 +88,14 @@ fn repository_variable_endpoint(var: &str) -> String {
     )
 }
 
+fn repository_cache_endpoint(key: &str) -> String {
+    let vars = VARS.get().expect("set on startup");
+    format!(
+        "{GIT_BASE_URL}/repos/{}/{}/actions/caches?key={key}",
+        vars.owner, vars.repo
+    )
+}
+
 fn workflow_endpoint_state(state: Workflow) -> String {
     let vars = VARS.get().expect("set on startup");
     format!(
@@ -308,4 +316,19 @@ fn encrypt_secret(secret: &str, public_key: &str) -> Result<String, Error> {
     let encrypted_bytes = public_key.seal(&mut OsRng, secret.as_bytes())?;
 
     Ok(BASE64.encode(&encrypted_bytes))
+}
+
+pub async fn delete_cache_by_key(key: &str) -> Result<(), Error> {
+    let server_response = reqwest::Client::new()
+        .delete(repository_cache_endpoint(key))
+        .headers(git_header())
+        .send()
+        .await?;
+
+    if server_response.status() != OK_RESPONSE {
+        return Err(Error::BadResponse(server_response.text().await?));
+    }
+
+    println!("Removed old cache with key: {key}");
+    Ok(())
 }

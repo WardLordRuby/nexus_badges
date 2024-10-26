@@ -7,8 +7,8 @@ use crate::{
     },
     services::{
         git::{
-            create_remote, get_public_key, set_repository_secret, set_repository_variable,
-            set_workflow_state, update_remote,
+            create_remote, delete_cache_by_key, get_public_key, set_repository_secret,
+            set_repository_variable, set_workflow_state, update_remote,
         },
         nexus::update_download_counts,
     },
@@ -271,9 +271,19 @@ async fn update_remote_variables(input_mods: Vec<Mod>) -> Result<(), Error> {
 }
 
 /// NOTE: this command is not supported on local
-pub async fn repo_variable_from_remote(key: &str, val: &str) -> Result<(), Error> {
+pub async fn update_cache_key(old: &str, new: &str) -> Result<(), Error> {
+    const CACHE_KEY: &str = "CACHED_BIN";
+
     VARS.set(StartupVars::git_api_only()?)
         .expect("`startup` never gets to run");
 
-    set_repository_variable(key, val).await
+    let (delete_res, set_res) = tokio::join!(
+        delete_cache_by_key(old),
+        set_repository_variable(CACHE_KEY, new)
+    );
+
+    set_res?;
+    delete_res?;
+
+    Ok(())
 }

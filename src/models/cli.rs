@@ -38,14 +38,16 @@ pub enum Commands {
     /// Display current version
     Version,
 
-    /// Set/Update a repository variable [Not supported on local]
+    /// Remove previous cache and update the cache repository variable [Not supported on local]
     #[command(hide = true)]
-    RepoVariable {
+    UpdateCacheKey {
+        /// Cache Key to be deleted
         #[arg(long)]
-        key: String,
+        old: String,
 
+        /// Cache repository variable to be updated
         #[arg(long)]
-        val: String,
+        new: String,
     },
 }
 

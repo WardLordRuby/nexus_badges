@@ -55,12 +55,12 @@ jobs:
           gunzip -f ./nexus-mods.gz
           chmod +x ./nexus-mods
 
-      - name: Update cache key
+      - name: Remove old cache & update cache key
         if: steps.download_latest.outcome == 'success'
         continue-on-error: true
         env:
           REPO_FULL: ${{ github.repository }}
-        run: ./nexus-mods --remote repo-variable --key CACHED_BIN --val ${{ steps.download_latest.outputs.cache_key_new }}
+        run: ./nexus-mods --remote update-cache-key --old ${{ vars.CACHED_BIN }} --new ${{ steps.download_latest.outputs.cache_key_new }}
 
       - name: Run binary
         env:
