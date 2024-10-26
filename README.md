@@ -17,16 +17,24 @@ within the same private gist. Supports tracking of multiple Nexus Mods. Unique b
 are fetched directly from the Nexus api.  
 
 ## Prerequisites
-- Find your Nexus 'Personal API Key' by logging in to Nexus Mods, then head to [next.nexusmods.com/settings/api-keys][Nexus-key]. Scrolling all the way to the bottom
-  you will find your Personal key.
-- Create a new git 'Fine-grained personal access token'. Ensure you are logged in to github and head to [github.com/settings/tokens][Git-key]
+- Log into your Nexus Mods account and find your Nexus ['Personal API Key'][Nexus-key]. Scrolling all the way to the bottom
+  of the linked page you will find your Personal key.
+- **GitHub action automation users only:** Create a fork of this repository
+- Ensure you are logged in to github and create a new git ['Fine-grained personal access token'][Git-key].
   1. Press 'Generate new token'
   2. Give the token a name and set its expiration date
-  3. Expand the 'Account permissions' section
-  4. Find sub-category 'Gists' and set to 'Read and Write'
+  3. **GitHub action automation users only:** Under 'Repository access' select 'Only select repositories' then choose your forked repository
+  4. Add permissions listed below based on how you want use Nexus Badges
 
 <div align="center">
-    <img src="https://i.imgur.com/1eNFHWu.png" width="80%">
+    
+  | Permission Name     | Type       | Access lvl         | Required    | Required for GitHub action automation |
+  |---------------------|------------|--------------------|------------:|--------------------------------------:|
+  | Gists               | Account    | Read and write     |          ✅|                                     ✅|
+  | Actions             | Repository | Read and write     |             |                                     ✅|
+  | Secrets             | Repository | Read and write     |             |                                     ✅|
+  | Variables           | Repository | Read and write     |             |                                     ✅|
+
 </div>
 
 ## Usage
@@ -47,6 +55,12 @@ To initialize the private gist that will store the download counts use the `init
 ```
 nexus_badges.exe init
 ```
+**For GitHub action automation:**
+To initialize the automation workflow on your forked repository use the `init-actons` command  
+```
+nexus_badges.exe init-actions
+```
+The automation workflow is setup to update the remote gist once daily.
 
 After the initial setup is complete running the application will update the remote gist with the _current_ download counts for each tracked mod. Then store the proper
 markdown of each badge in './io/badges.md'. Now you can copy your badges to your repository README.md or anywhere else that supports markdown. As long as you don't delete
