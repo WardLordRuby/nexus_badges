@@ -5,6 +5,7 @@ use nexus_badges::{
         init_actions, init_remote, process, update_args, update_cache_key, version, Modify,
     },
     models::cli::{Cli, Commands},
+    return_after,
     services::git::set_workflow_state,
     startup, unsupported,
 };
@@ -16,25 +17,15 @@ async fn main() {
     if let Some(ref command) = cli.command {
         match command {
             Commands::Version => {
-                version(cli.remote)
-                    .await
-                    .unwrap_or_else(|err| eprintln!("{err}"));
-                return;
+                return_after!(version(cli.remote).await, cli.remote);
             }
             &Commands::Automation { state } => {
                 unsupported!(command, on_remote, cli.remote);
-                set_workflow_state(state)
-                    .await
-                    .unwrap_or_else(|err| eprintln!("{err}"));
-                return;
+                return_after!(set_workflow_state(state).await, cli.remote);
             }
             Commands::UpdateCacheKey { old, new } => {
                 unsupported!(command, on_local, cli.remote);
-                update_cache_key(old, new).await.unwrap_or_else(|err| {
-                    eprintln!("{err}");
-                    std::process::exit(1)
-                });
-                return;
+                return_after!(update_cache_key(old, new).await, cli.remote);
             }
             _ => (),
         }

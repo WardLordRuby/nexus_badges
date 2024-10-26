@@ -49,18 +49,31 @@ static VARS: OnceLock<StartupVars> = OnceLock::new();
 
 #[macro_export]
 macro_rules! unsupported {
-    ($command:ident, on_remote, $remote:expr) => {
-        if $remote {
+    ($command:ident, on_remote, $on_remote:expr) => {
+        if $on_remote {
             eprintln!("'{}' is not supported on remote", $command);
-            return;
+            std::process::exit(95)
         }
     };
 
-    ($command:ident, on_local, $remote:expr) => {
-        if !$remote {
+    ($command:ident, on_local, $on_remote:expr) => {
+        if !$on_remote {
             eprintln!("'{}' is only supported on remote", $command);
             return;
         }
+    };
+}
+
+#[macro_export]
+macro_rules! return_after {
+    ($result:expr, $on_remote:expr) => {
+        $result.unwrap_or_else(|err| {
+            eprintln!("{err}");
+            if $on_remote {
+                std::process::exit(1)
+            }
+        });
+        return;
     };
 }
 

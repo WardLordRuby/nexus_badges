@@ -43,6 +43,7 @@ jobs:
           echo "cache_key_new=${{ runner.os }}-binary-nexus-badges-${{ github.run_id }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
 
       - name: Cache latest binary
+        id: cache_latest
         if: steps.download_latest.outcome == 'success'
         uses: actions/cache/save@v4
         with:
@@ -56,7 +57,7 @@ jobs:
           chmod +x ./nexus-mods
 
       - name: Remove old cache & update cache key
-        if: steps.download_latest.outcome == 'success'
+        if: steps.cache_latest.outcome == 'success'
         continue-on-error: true
         env:
           REPO_FULL: ${{ github.repository }}
