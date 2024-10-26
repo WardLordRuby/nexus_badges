@@ -54,54 +54,61 @@ pub trait Modify {
     ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 }
 
-async fn update_mods_in_input(input_mods: Vec<Mod>) -> Result<(), Error> {
-    let new_mod_json = (verify_repo().is_ok()).then(|| {
-        serde_json::to_string(&input_mods.clone()).expect("`Vec<Mod>` is always ok to stringify")
-    });
-    let updated = Input::from(VARS.get().expect("set on startup"), input_mods);
-    write(updated, INPUT_PATH)?;
+trait Update {
+    fn write_and_try_set_remote(
+        self,
+    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+}
 
-    if let Some(new_variable) = new_mod_json {
-        if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
-            println!("{INPUT_PATH} updated locally");
-            return Err(err);
+impl Update for Vec<Mod> {
+    async fn write_and_try_set_remote(self) -> Result<(), Error> {
+        let new_mod_json = (verify_repo().is_ok()).then(|| {
+            serde_json::to_string(&self.clone()).expect("`Vec<Mod>` is always ok to stringify")
+        });
+        let updated = Input::from(VARS.get().expect("set on startup"), self);
+        write(updated, INPUT_PATH)?;
+
+        if let Some(new_variable) = new_mod_json {
+            if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
+                println!("{INPUT_PATH} updated locally");
+                return Err(err);
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
 impl Modify for Vec<Mod> {
     async fn add_mod(mut self, details: Mod) -> Result<(), Error> {
         if self.contains(&details) {
-            Err(Error::Io(io::Error::new(
+            return Err(Error::Io(io::Error::new(
                 ErrorKind::InvalidInput,
                 format!("Mod already exists in: {INPUT_PATH}"),
-            )))
-        } else {
-            self.push(details);
-
-            update_mods_in_input(self).await?;
-
-            println!("Mod Registered!");
-            Ok(())
+            )));
         }
+        self.push(details);
+        self.write_and_try_set_remote().await?;
+
+        println!("Mod Registered!");
+        Ok(())
     }
 
     async fn remove_mod(mut self, details: Mod) -> Result<(), Error> {
-        if let Some(i) = self.iter().position(|mod_details| *mod_details == details) {
-            self.swap_remove(i);
+        let i = self
+            .iter()
+            .position(|mod_details| *mod_details == details)
+            .ok_or_else(|| {
+                Error::Io(io::Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("Mod does not exist in: {INPUT_PATH}"),
+                ))
+            })?;
+        self.swap_remove(i);
+        self.write_and_try_set_remote().await?;
 
-            update_mods_in_input(self).await?;
-
-            println!("Mod removed!");
-            Ok(())
-        } else {
-            Err(Error::Io(io::Error::new(
-                ErrorKind::InvalidInput,
-                format!("Mod does not exist in: {INPUT_PATH}"),
-            )))
-        }
+        println!("Mod removed!");
+        Ok(())
     }
 }
 
