@@ -35,9 +35,10 @@ async fn main() {
         Ok(data) => data,
         Err(err) => {
             eprintln!("{err}");
-            if !cli.remote {
-                await_user_for_end();
+            if cli.remote {
+                std::process::exit(1);
             }
+            await_user_for_end();
             return;
         }
     };
@@ -66,11 +67,12 @@ async fn main() {
             Commands::Version => unreachable!("by version guard"),
         }
     } else {
-        process(input_mods, cli.remote)
-            .await
-            .unwrap_or_else(|err| eprintln!("{err}"));
-        if !cli.remote {
-            await_user_for_end();
-        }
+        if let Err(err) = process(input_mods, cli.remote).await {
+            eprintln!("{err}");
+            if cli.remote {
+                std::process::exit(1);
+            }
+        };
+        await_user_for_end();
     }
 }

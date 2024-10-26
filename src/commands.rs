@@ -25,8 +25,14 @@ pub async fn version(on_remote: bool) -> reqwest::Result<()> {
     let ver_res = check_program_version().await;
     if on_remote {
         match ver_res {
-            Ok(Some(_)) => std::process::exit(70),
-            Ok(None) => std::process::exit(0),
+            Ok(Some(_)) => {
+                println!("New Nexus Badges version available");
+                std::process::exit(70)
+            }
+            Ok(None) => {
+                println!("Nexus Badges up to date");
+                std::process::exit(0)
+            }
             Err(err) => {
                 eprintln!("{err}");
                 std::process::exit(20)
