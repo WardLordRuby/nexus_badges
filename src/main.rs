@@ -25,7 +25,7 @@ async fn main() {
             }
             Commands::UpdateCacheKey { old, new } => {
                 unsupported!(command, on_local, cli.remote);
-                return_after!(update_cache_key(old, new).await, cli.remote);
+                return_after!(update_cache_key(old.as_ref(), new).await, cli.remote);
             }
             _ => (),
         }

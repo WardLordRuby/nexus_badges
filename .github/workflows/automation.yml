@@ -56,8 +56,15 @@ jobs:
           gunzip -f ./nexus-mods.gz
           chmod +x ./nexus-mods
 
+      - name: Set cache key
+        if: ${{ !steps.cache.outputs.cache-hit && steps.cache_latest.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          REPO_FULL: ${{ github.repository }}
+        run: ./nexus-mods --remote update-cache-key --new ${{ steps.download_latest.outputs.cache_key_new }}
+
       - name: Remove old cache & update cache key
-        if: steps.cache_latest.outcome == 'success'
+        if: ${{ steps.cache.outputs.cache-hit && steps.cache_latest.outcome == 'success' }}
         continue-on-error: true
         env:
           REPO_FULL: ${{ github.repository }}

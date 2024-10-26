@@ -43,7 +43,7 @@ pub enum Commands {
     UpdateCacheKey {
         /// Cache Key to be deleted
         #[arg(long)]
-        old: String,
+        old: Option<String>,
 
         /// Cache repository variable to be updated
         #[arg(long)]

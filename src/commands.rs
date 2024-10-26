@@ -16,7 +16,9 @@ use crate::{
     ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, VARS,
 };
 use std::{
+    future::Future,
     io::{self, ErrorKind},
+    pin::Pin,
     sync::Arc,
 };
 use tokio::task::JoinSet;
@@ -278,15 +280,23 @@ async fn update_remote_variables(input_mods: Vec<Mod>) -> Result<(), Error> {
 }
 
 /// NOTE: this command is not supported on local
-pub async fn update_cache_key(old: &str, new: &str) -> Result<(), Error> {
+pub async fn update_cache_key<S>(old: Option<S>, new: S) -> Result<(), Error>
+where
+    S: AsRef<str> + Send,
+{
     const CACHE_KEY: &str = "CACHED_BIN";
 
     VARS.set(StartupVars::git_api_only()?)
         .expect("`startup` never gets to run");
 
+    let delete_task: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = old
+        .map_or(Box::pin(async move { Ok(()) }), |prev| {
+            Box::pin(async move { delete_cache_by_key(prev.as_ref()).await })
+        });
+
     let (delete_res, set_res) = tokio::join!(
-        delete_cache_by_key(old),
-        set_repository_variable(CACHE_KEY, new)
+        delete_task,
+        set_repository_variable(CACHE_KEY, new.as_ref())
     );
 
     set_res?;
