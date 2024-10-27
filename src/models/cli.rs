@@ -26,16 +26,16 @@ pub enum Commands {
     /// Initalize private gist to be used as a json endpoint for badge download counters
     Init,
 
-    /// Initalize GitHub actions to run the binary at scheduled times
+    /// Initalize GitHub actions to update the remote gist once daily
     InitActions,
 
-    /// Set the state for download counter automation via GitHub actions
+    /// Enable/Disable the GitHub action automation workflow
     Automation {
         #[arg(value_enum)]
         state: Workflow,
     },
 
-    /// Display current version
+    /// Display current version and check for updates
     Version,
 
     /// Remove previous cache and update the cache repository variable [Not supported on local]
