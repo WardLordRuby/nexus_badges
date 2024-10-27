@@ -45,7 +45,11 @@ nexus_badges.exe set-arg --git <GIT_TOKEN> --nexus <NEXUS_TOKEN>
 ```
 
 <div align="center">  
-  <img src="https://i.imgur.com/888tw4j.png" width="70%">  
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://i.imgur.com/T1wrzhk.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://i.imgur.com/BtT620l.png">
+    <img src="https://i.imgur.com/888tw4j.png" width="70%">
+  </picture>
 </div>  
 
 To track the download count of a nexus mod use the `add` command. Mods are tracked by their 'game_domain' and 'mod_id'. Locating them is easy by looking at the mod's url.  
