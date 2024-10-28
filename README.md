@@ -17,6 +17,10 @@ Nexus Badges is a CLI tool that automates the process of creating and updating d
 within the same private gist. Supports tracking of multiple Nexus Mods. Unique badges will be generated for each tracked mod. Download counts saved in the gist endpoint
 are fetched directly from the Nexus api.  
 
+## Compatibility
+Nexus Badges is compatible with all major platforms. You can download releases for Windows, Linux, and macOS. If your target platform isn't listed, you can compile the 
+source code directly for your desired system.
+
 ## Prerequisites
 - Log into your Nexus Mods account and find your Nexus ['Personal API Key'][Nexus-key]. Scrolling all the way to the bottom
   of the linked page you will find your Personal key.
@@ -47,7 +51,7 @@ nexus_badges.exe set-arg --git <GIT_TOKEN> --nexus <NEXUS_TOKEN>
 <div align="center">  
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://i.imgur.com/T1wrzhk.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://i.imgur.com/BtT620l.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://i.imgur.com/yTUpMLH.png">
     <img src="https://i.imgur.com/888tw4j.png" width="70%">
   </picture>
 </div>  
@@ -72,6 +76,7 @@ nexus_badges.exe init-actions
 The automation workflow is set up to update the remote gist every 8 hours. After a successful `init-actions` there is no need to run it after subsequent `add` or `remove`
 commands. 
 
-After the initial set up is complete running the application will update the remote gist with the _current_ download counts for each tracked mod. Then store the proper
+### Normal usage
+After the initial set up is complete running Nexus Badges will update the remote gist with the _current_ download counts for each tracked mod. Then store the proper
 markdown of each badge in './io/badges.md'. Now you can copy your badges to your repository README.md or anywhere else that supports markdown. As long as you don't delete
-the private gist you will not have to modify the badge. Just run the app whenever you want the count to be updated.  
+the private gist you will not have to modify the badge. Just run Nexus Badges whenever you want the count to be updated.  
