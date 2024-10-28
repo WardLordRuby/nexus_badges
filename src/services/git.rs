@@ -318,9 +318,9 @@ fn encrypt_secret(secret: &str, public_key: &str) -> Result<String, Error> {
     Ok(BASE64.encode(&encrypted_bytes))
 }
 
-pub async fn delete_cache_by_key<S: AsRef<str>>(key: S) -> Result<(), Error> {
+pub async fn delete_cache_by_key(key: &str) -> Result<(), Error> {
     let server_response = reqwest::Client::new()
-        .delete(repository_cache_endpoint(key.as_ref()))
+        .delete(repository_cache_endpoint(key))
         .headers(git_header())
         .send()
         .await?;
@@ -329,6 +329,6 @@ pub async fn delete_cache_by_key<S: AsRef<str>>(key: S) -> Result<(), Error> {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
-    println!("Removed old cache with key: {}", key.as_ref());
+    println!("Removed old cache with key: {key}");
     Ok(())
 }

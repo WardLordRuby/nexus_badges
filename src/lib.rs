@@ -77,6 +77,13 @@ macro_rules! return_after {
     };
 }
 
+#[macro_export]
+macro_rules! print_err {
+    ($result:expr) => {
+        $result.unwrap_or_else(|err| eprintln!("{err}"))
+    };
+}
+
 impl Display for Commands {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -139,7 +146,7 @@ fn verify_git() -> Result<(), Error> {
 
 async fn verify_gist() -> Result<(String, GistResponse), Error> {
     if VARS.get().expect("set on startup").gist_id.is_empty() {
-        return Err(Error::Missing(
+        return Err(Error::NotSetup(
             "Use command 'init' to initialize a new remote gist",
         ));
     }
@@ -150,6 +157,14 @@ async fn verify_gist() -> Result<(String, GistResponse), Error> {
 
 fn verify_repo() -> Result<(), Error> {
     let vars = VARS.get().expect("set on startup");
+    if vars.repo.is_empty() && vars.owner.is_empty() {
+        return Err(Error::NotSetup(
+            "No repository set as target location of 'automation.yml' workflow.\n\
+            To setup automation workflow use commands:\n\
+            - 'nexus_badges.exe set-arg --owner <GITHUB_NAME> --repo <REPOSITORY_NAME>'\n
+            - 'nexus_badges.exe init-actions'",
+        ));
+    }
     if vars.repo.is_empty() {
         return Err(Error::Missing(
             "Use command 'set --repo' to input your forked 'nexus_badges'",

@@ -108,7 +108,7 @@ impl Modify for Vec<Mod> {
     }
 }
 
-macro_rules! early_return_on_err {
+macro_rules! propagate_err {
     ($option_res:expr) => {
         if let Some(res) = $option_res {
             res?;
@@ -150,44 +150,47 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
 
     println!("Key(s) updated locally");
 
-    Ok(())
+    verify_repo()
 }
 
 pub async fn update_args_remote(new: SetArgs) -> Result<(), Error> {
-    if verify_repo().is_ok() {
-        let vars = VARS.get().expect("set on startup");
+    debug_assert!(
+        verify_repo().is_ok(),
+        "expects condtion is checked before this fn is called"
+    );
 
-        let public_key_task =
-            (new.modified.git_token || new.modified.nexus_key).then(get_public_key);
-        let set_gist_id_task = new
+    let vars = VARS.get().expect("set on startup");
+
+    let public_key_task = (new.modified.git_token || new.modified.nexus_key).then(get_public_key);
+    let set_gist_id_task = new
+        .modified
+        .gist_id
+        .then(|| set_repository_variable(ENV_NAME_GIST_ID, &vars.gist_id));
+
+    let (public_key_res, set_gist_id_res) =
+        conditional_join(public_key_task, set_gist_id_task).await;
+
+    if let Some(res) = public_key_res {
+        let public_key = res?;
+
+        let set_git_token_task = new
             .modified
-            .gist_id
-            .then(|| set_repository_variable(ENV_NAME_GIST_ID, &vars.gist_id));
+            .git_token
+            .then(|| set_repository_secret(ENV_NAME_GIT, &vars.git_token, &public_key));
+        let set_nexus_key_task = new
+            .modified
+            .nexus_key
+            .then(|| set_repository_secret(ENV_NAME_NEXUS, &vars.nexus_key, &public_key));
 
-        let (public_key_res, set_gist_id_res) =
-            conditional_join(public_key_task, set_gist_id_task).await;
+        let (set_git_token_res, set_nexus_key_res) =
+            conditional_join(set_git_token_task, set_nexus_key_task).await;
 
-        if let Some(res) = public_key_res {
-            let public_key = res?;
-
-            let set_git_token_task = new
-                .modified
-                .git_token
-                .then(|| set_repository_secret(ENV_NAME_GIT, &vars.git_token, &public_key));
-            let set_nexus_key_task = new
-                .modified
-                .nexus_key
-                .then(|| set_repository_secret(ENV_NAME_NEXUS, &vars.nexus_key, &public_key));
-
-            let (set_git_token_res, set_nexus_key_res) =
-                conditional_join(set_git_token_task, set_nexus_key_task).await;
-
-            early_return_on_err!(set_git_token_res);
-            early_return_on_err!(set_nexus_key_res);
-        }
-
-        early_return_on_err!(set_gist_id_res);
+        propagate_err!(set_git_token_res);
+        propagate_err!(set_nexus_key_res);
     }
+
+    propagate_err!(set_gist_id_res);
+
     Ok(())
 }
 
@@ -272,22 +275,19 @@ async fn update_remote_variables(input_mods: Vec<Mod>) -> Result<(), Error> {
 }
 
 /// NOTE: this command is not supported on local
-pub async fn update_cache_key<S: AsRef<str>>(old: Option<S>, new: S) -> Result<(), Error> {
+pub async fn update_cache_key(old: Option<&str>, new: &str) -> Result<(), Error> {
     const CACHE_KEY: &str = "CACHED_BIN";
 
     VARS.set(StartupVars::git_api_only()?)
         .expect("`startup` never gets to run");
 
-    let delete_task = old.map(|prev| delete_cache_by_key(prev));
+    let delete_task = old.map(delete_cache_by_key);
 
-    let (delete_res, set_res) = conditional_join(
-        delete_task,
-        Some(set_repository_variable(CACHE_KEY, new.as_ref())),
-    )
-    .await;
+    let (delete_res, set_res) =
+        conditional_join(delete_task, Some(set_repository_variable(CACHE_KEY, new))).await;
 
-    early_return_on_err!(set_res);
-    early_return_on_err!(delete_res);
+    propagate_err!(set_res);
+    propagate_err!(delete_res);
 
     Ok(())
 }

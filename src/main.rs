@@ -5,8 +5,11 @@ use nexus_badges::{
         init_actions, init_remote, process, update_args_local, update_args_remote,
         update_cache_key, version, Modify,
     },
-    models::cli::{Cli, Commands},
-    return_after,
+    models::{
+        cli::{Cli, Commands},
+        error::Error,
+    },
+    print_err, return_after,
     services::git::set_workflow_state,
     startup, unsupported,
 };
@@ -26,12 +29,15 @@ async fn main() {
             }
             Commands::UpdateCacheKey { old, new } => {
                 unsupported!(command, on_local, cli.remote);
-                return_after!(update_cache_key(old.as_ref(), new).await, cli.remote);
+                return_after!(update_cache_key(old.as_deref(), new).await, cli.remote);
             }
             Commands::SetArg(args) => {
                 unsupported!(command, on_remote, cli.remote);
                 if let Err(err) = update_args_local(args).await {
-                    eprintln!("{err}");
+                    match err {
+                        Error::NotSetup(_) => (),
+                        _ => eprintln!("{err}"),
+                    }
                     return;
                 };
             }
@@ -54,23 +60,11 @@ async fn main() {
     if let Some(command) = cli.command {
         unsupported!(command, on_remote, cli.remote);
         match command {
-            Commands::SetArg(args) => update_args_remote(args)
-                .await
-                .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::Add(details) => input_mods
-                .add_mod(details)
-                .await
-                .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::Remove(details) => input_mods
-                .remove_mod(details)
-                .await
-                .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::Init => init_remote(input_mods)
-                .await
-                .unwrap_or_else(|err| eprintln!("{err}")),
-            Commands::InitActions => init_actions(input_mods)
-                .await
-                .unwrap_or_else(|err| eprintln!("{err}")),
+            Commands::SetArg(args) => print_err!(update_args_remote(args).await),
+            Commands::Add(details) => print_err!(input_mods.add_mod(details).await),
+            Commands::Remove(details) => print_err!(input_mods.remove_mod(details).await),
+            Commands::Init => print_err!(init_remote(input_mods).await),
+            Commands::InitActions => print_err!(init_actions(input_mods).await),
             Commands::UpdateCacheKey { old: _, new: _ } => unreachable!("by repo-variable guard"),
             Commands::Automation { state: _ } => unreachable!("by automation guard"),
             Commands::Version => unreachable!("by version guard"),
