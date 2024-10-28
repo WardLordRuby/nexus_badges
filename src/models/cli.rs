@@ -62,7 +62,7 @@ pub struct Mod {
     pub mod_id: usize,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Default)]
 #[group(multiple = true, required = true)]
 pub struct SetArgs {
     /// Github fine-grained private token with read/write permissions for gists
@@ -87,6 +87,16 @@ pub struct SetArgs {
     /// {n}  [Required for GitHub actions setup]
     #[arg(long)]
     pub repo: Option<String>,
+
+    #[clap(skip)]
+    pub modified: ModFlags,
+}
+
+#[derive(Debug, Default)]
+pub struct ModFlags {
+    pub git_token: bool,
+    pub nexus_key: bool,
+    pub gist_id: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]

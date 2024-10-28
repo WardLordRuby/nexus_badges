@@ -1,5 +1,5 @@
 use crate::{
-    check_program_version,
+    check_program_version, conditional_join,
     models::{
         cli::{Mod, SetArgs, Workflow},
         error::Error,
@@ -15,13 +15,7 @@ use crate::{
     verify_gist, verify_git, verify_repo, write, write_badges, StartupVars, ENV_NAME_GIST_ID,
     ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, VARS,
 };
-use std::{
-    future::Future,
-    io::{self, ErrorKind},
-    pin::Pin,
-    sync::Arc,
-};
-use tokio::task::JoinSet;
+use std::io::{self, ErrorKind};
 
 pub async fn version(on_remote: bool) -> reqwest::Result<()> {
     let ver_res = check_program_version().await;
@@ -114,41 +108,39 @@ impl Modify for Vec<Mod> {
     }
 }
 
-macro_rules! clone_if {
-    ($condition:expr, $target:ident, $value:expr) => {
-        if $condition {
-            $target = Some($value.clone());
+macro_rules! early_return_on_err {
+    ($option_res:expr) => {
+        if let Some(res) = $option_res {
+            res?;
         }
     };
 }
 
-pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), Error> {
-    let mut curr = Input::from(VARS.get().expect("set on startup"), input_mods);
-    let try_update_remote_env = verify_repo().is_ok();
-    let (mut new_git_token, mut new_nexus_key, mut new_gist_id) = (None, None, None);
+pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
+    let mut curr = Input::from_file()?;
 
-    if let Some(token) = new.git {
-        clone_if!(try_update_remote_env, new_git_token, token);
-        curr.git_token = token;
+    if let Some(ref mut token) = new.git {
+        new.modified.git_token = true;
+        curr.git_token = std::mem::take(token);
     }
-    if let Some(key) = new.nexus {
-        clone_if!(try_update_remote_env, new_nexus_key, key);
-        curr.nexus_key = key;
+    if let Some(ref mut key) = new.nexus {
+        new.modified.nexus_key = true;
+        curr.nexus_key = std::mem::take(key);
     }
     if let Some(ref mut id) = new.gist {
-        clone_if!(try_update_remote_env, new_gist_id, id);
+        new.modified.gist_id = true;
         std::mem::swap(&mut curr.gist_id, id);
     }
-    if let Some(repo) = new.repo {
-        curr.repo = repo;
+    if let Some(ref mut repo) = new.repo {
+        curr.repo = std::mem::take(repo);
     }
-    if let Some(owner) = new.owner {
-        curr.owner = owner;
+    if let Some(ref mut owner) = new.owner {
+        curr.owner = std::mem::take(owner);
     }
 
     write(curr, INPUT_PATH)?;
 
-    if let Some(prev_id) = new.gist {
+    if let Some(ref prev_id) = new.gist {
         if !prev_id.is_empty() {
             // MARK: XXX
             // Do we require confirmation for these kind of overwrites?
@@ -158,44 +150,44 @@ pub async fn update_args(input_mods: Vec<Mod>, mut new: SetArgs) -> Result<(), E
 
     println!("Key(s) updated locally");
 
-    if try_update_remote_env
-        && (new_git_token.is_some() || new_nexus_key.is_some() || new_gist_id.is_some())
-    {
-        let public_key = get_public_key().await.map_or_else(
-            |err| {
-                eprintln!("{err}");
-                None
-            },
-            Some,
-        );
+    Ok(())
+}
 
-        let mut tasks = JoinSet::new();
+pub async fn update_args_remote(new: SetArgs) -> Result<(), Error> {
+    if verify_repo().is_ok() {
+        let vars = VARS.get().expect("set on startup");
 
-        if let Some(key) = public_key {
-            let key_arc = Arc::new(key);
-            if let Some(secret) = new_git_token {
-                let key_clone = Arc::clone(&key_arc);
-                tasks.spawn(async move {
-                    set_repository_secret(ENV_NAME_GIT, &secret, &key_clone).await
-                });
-            }
-            if let Some(secret) = new_nexus_key {
-                tasks.spawn(async move {
-                    set_repository_secret(ENV_NAME_NEXUS, &secret, &key_arc).await
-                });
-            }
-        }
-        if let Some(id) = new_gist_id {
-            tasks.spawn(async move { set_repository_variable(ENV_NAME_GIST_ID, &id).await });
+        let public_key_task =
+            (new.modified.git_token || new.modified.nexus_key).then(get_public_key);
+        let set_gist_id_task = new
+            .modified
+            .gist_id
+            .then(|| set_repository_variable(ENV_NAME_GIST_ID, &vars.gist_id));
+
+        let (public_key_res, set_gist_id_res) =
+            conditional_join(public_key_task, set_gist_id_task).await;
+
+        if let Some(res) = public_key_res {
+            let public_key = res?;
+
+            let set_git_token_task = new
+                .modified
+                .git_token
+                .then(|| set_repository_secret(ENV_NAME_GIT, &vars.git_token, &public_key));
+            let set_nexus_key_task = new
+                .modified
+                .nexus_key
+                .then(|| set_repository_secret(ENV_NAME_NEXUS, &vars.nexus_key, &public_key));
+
+            let (set_git_token_res, set_nexus_key_res) =
+                conditional_join(set_git_token_task, set_nexus_key_task).await;
+
+            early_return_on_err!(set_git_token_res);
+            early_return_on_err!(set_nexus_key_res);
         }
 
-        while let Some(res) = tasks.join_next().await {
-            if let Err(err) = res.expect("task can not panic") {
-                eprintln!("{err}")
-            }
-        }
+        early_return_on_err!(set_gist_id_res);
     }
-
     Ok(())
 }
 
@@ -280,27 +272,22 @@ async fn update_remote_variables(input_mods: Vec<Mod>) -> Result<(), Error> {
 }
 
 /// NOTE: this command is not supported on local
-pub async fn update_cache_key<S>(old: Option<S>, new: S) -> Result<(), Error>
-where
-    S: AsRef<str> + Send,
-{
+pub async fn update_cache_key<S: AsRef<str>>(old: Option<S>, new: S) -> Result<(), Error> {
     const CACHE_KEY: &str = "CACHED_BIN";
 
     VARS.set(StartupVars::git_api_only()?)
         .expect("`startup` never gets to run");
 
-    let delete_task: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = old
-        .map_or(Box::pin(async move { Ok(()) }), |prev| {
-            Box::pin(async move { delete_cache_by_key(prev.as_ref()).await })
-        });
+    let delete_task = old.map(|prev| delete_cache_by_key(prev));
 
-    let (delete_res, set_res) = tokio::join!(
+    let (delete_res, set_res) = conditional_join(
         delete_task,
-        set_repository_variable(CACHE_KEY, new.as_ref())
-    );
+        Some(set_repository_variable(CACHE_KEY, new.as_ref())),
+    )
+    .await;
 
-    set_res?;
-    delete_res?;
+    early_return_on_err!(set_res);
+    early_return_on_err!(delete_res);
 
     Ok(())
 }

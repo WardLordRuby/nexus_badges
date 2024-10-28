@@ -287,6 +287,9 @@ pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
     Ok(())
 }
 
+// MARK: TODO
+// add badge formatter for url, rSt, AsciiDoc, HTML
+
 fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
     let mut file = File::create(BADGES_PATH)?;
     let encoded_url = percent_encode(universal_url.as_bytes(), CUSTOM_ENCODE_SET);
@@ -333,3 +336,18 @@ const CUSTOM_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b']')
     .add(b'^')
     .add(b'|');
+
+pub async fn conditional_join<T1, T2>(
+    task1: Option<impl std::future::Future<Output = T1>>,
+    task2: Option<impl std::future::Future<Output = T2>>,
+) -> (Option<T1>, Option<T2>) {
+    match (task1, task2) {
+        (Some(t1), Some(t2)) => {
+            let (r1, r2) = tokio::join!(t1, t2);
+            (Some(r1), Some(r2))
+        }
+        (Some(t1), None) => (Some(t1.await), None),
+        (None, Some(t2)) => (None, Some(t2.await)),
+        (None, None) => (None, None),
+    }
+}
