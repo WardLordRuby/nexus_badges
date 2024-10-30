@@ -95,7 +95,7 @@ pub struct SetArgs {
 
     /// Specify download count to use [Default: total]
     #[arg(long)]
-    pub counter: Option<DownloadCount>,
+    pub count: Option<DownloadCount>,
 
     /// Specify label to use on badges [Default: 'Nexus Downloads']
     /// {n}  [Tip: use quotes to include spaces]
@@ -114,26 +114,6 @@ pub struct SetArgs {
 
     #[clap(skip)]
     pub modified: ModFlags,
-}
-
-impl SetArgs {
-    #[inline]
-    pub fn key_modified(&self) -> bool {
-        self.git.is_some()
-            || self.nexus.is_some()
-            || self.gist.is_some()
-            || self.owner.is_some()
-            || self.repo.is_some()
-    }
-
-    #[inline]
-    pub fn pref_modified(&self) -> bool {
-        self.style.is_some()
-            || self.counter.is_some()
-            || self.label.is_some()
-            || self.label_color.is_some()
-            || self.color.is_some()
-    }
 }
 
 #[derive(Debug, Default)]

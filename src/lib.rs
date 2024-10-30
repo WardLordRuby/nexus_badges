@@ -336,7 +336,7 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
     writeln!(writer, "{badge_prefs}")?;
 
     for (uid, entry) in output.into_iter() {
-        let query = format!("$.{uid}.{}", badge_prefs.counter.field_name());
+        let query = format!("$.{uid}.{}", badge_prefs.count.field_name());
         let encoded_query = percent_encode(query.as_bytes(), CUSTOM_ENCODE_SET);
         writeln!(writer, "## {}", entry.name)?;
         writeln!(writer, "```markdown")?;

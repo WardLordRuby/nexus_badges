@@ -9,7 +9,7 @@ use std::{
 #[serde(default)]
 pub struct BadgePreferences {
     style: BadgeStyle,
-    pub counter: DownloadCount,
+    pub count: DownloadCount,
     pub label: String,
     #[serde(skip_serializing_if = "Color::is_none")]
     pub label_color: Color,
@@ -24,10 +24,10 @@ impl BadgePreferences {
             output.push_str(&format!("&style={style}"));
         }
         if let Some(color) = self.label_color.0 {
-            output.push_str(&format!("&labelColor={}", color.as_encoded_hex()));
+            output.push_str(&format!("&labelColor={}", color.percent_encoded_hex()));
         }
         if let Some(color) = self.color.0 {
-            output.push_str(&format!("&color={}", color.as_encoded_hex()));
+            output.push_str(&format!("&color={}", color.percent_encoded_hex()));
         }
         output
     }
@@ -48,56 +48,54 @@ impl BadgePreferences {
 impl Default for BadgePreferences {
     fn default() -> Self {
         BadgePreferences {
-            style: BadgeStyle::default(),
-            counter: DownloadCount::default(),
             label: String::from("Nexus Downloads"),
-            label_color: Color(None),
-            color: Color(None),
+            style: BadgeStyle::default(),
+            count: DownloadCount::default(),
+            label_color: Color::default(),
+            color: Color::default(),
         }
     }
 }
 
 impl Display for BadgePreferences {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Style preferences: ")?;
+        writeln!(f, "Style preferences:")?;
         writeln!(f, "- Label: {}", self.label)?;
-        writeln!(f, "- Tracking: {}", self.counter)?;
-        if let Some(style) = self.style() {
-            writeln!(f, "- Style: {style}")?;
-        }
-        if let Some(color) = self.label_color.0 {
-            writeln!(f, "- Label color: {}", color.as_hex_color())?;
-        }
-        if let Some(color) = self.color.0 {
-            writeln!(f, "- Color: {}", color.as_hex_color())?;
-        }
+        writeln!(f, "- Count: {}", self.count)?;
+        writeln!(f, "- Style: {}", self.style)?;
+        writeln!(f, "- Label color: {}", self.label_color)?;
+        writeln!(f, "- Color: {}", self.color)?;
         Ok(())
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default)]
 pub struct Color(Option<u32>);
 
 impl Color {
     #[inline]
-    fn is_none(&self) -> bool {
+    pub fn is_none(&self) -> bool {
         self.0.is_none()
     }
 }
 
+impl Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(color) = self.0 {
+            return write!(f, "#{color:06x}");
+        }
+        write!(f, "default")
+    }
+}
+
 pub trait EncodedHex {
-    fn as_encoded_hex(&self) -> String;
-    fn as_hex_color(&self) -> String;
+    fn percent_encoded_hex(&self) -> String;
 }
 
 impl EncodedHex for u32 {
     #[inline]
-    fn as_encoded_hex(&self) -> String {
+    fn percent_encoded_hex(&self) -> String {
         format!("%23{self:06x}")
-    }
-    #[inline]
-    fn as_hex_color(&self) -> String {
-        format!("#{self:06x}")
     }
 }
 

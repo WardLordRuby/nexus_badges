@@ -119,49 +119,73 @@ macro_rules! propagate_err {
     };
 }
 
+impl Input {
+    fn update(&mut self, from: &mut SetArgs) -> bool {
+        let mut modified = false;
+
+        if let Some(ref mut token) = from.git {
+            from.modified.git_token = true;
+            self.git_token = std::mem::take(token);
+        }
+        if let Some(ref mut key) = from.nexus {
+            from.modified.nexus_key = true;
+            self.nexus_key = std::mem::take(key);
+        }
+        if let Some(ref mut id) = from.gist {
+            from.modified.gist_id = true;
+            std::mem::swap(&mut self.gist_id, id);
+        }
+        if let Some(ref mut repo) = from.repo {
+            modified = true;
+            self.repo = std::mem::take(repo);
+        }
+        if let Some(ref mut owner) = from.owner {
+            modified = true;
+            self.owner = std::mem::take(owner);
+        }
+        from.modified.any() || modified
+    }
+}
+
+impl BadgePreferences {
+    fn update(&mut self, from: &mut SetArgs) -> bool {
+        let mut modified = false;
+
+        if let Some(style) = from.style {
+            modified = true;
+            self.set_style(style);
+        }
+        if let Some(count_type) = from.count {
+            modified = true;
+            self.count = count_type;
+        }
+        if let Some(ref mut label) = from.label {
+            modified = true;
+            self.label = std::mem::take(label);
+        }
+        if let Some(color) = from.label_color {
+            modified = true;
+            self.label_color = color;
+        }
+        if let Some(color) = from.color {
+            modified = true;
+            self.color = color;
+        }
+        modified
+    }
+}
+
 pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
-    let mut curr = Input::from_file()?;
+    let mut curr_keys = Input::from_file()?;
     let mut curr_badge = read::<BadgePreferences>(PREFERENCES_PATH).unwrap_or_default();
 
-    if let Some(ref mut token) = new.git {
-        new.modified.git_token = true;
-        curr.git_token = std::mem::take(token);
-    }
-    if let Some(ref mut key) = new.nexus {
-        new.modified.nexus_key = true;
-        curr.nexus_key = std::mem::take(key);
-    }
-    if let Some(ref mut id) = new.gist {
-        new.modified.gist_id = true;
-        std::mem::swap(&mut curr.gist_id, id);
-    }
-    if let Some(ref mut repo) = new.repo {
-        curr.repo = std::mem::take(repo);
-    }
-    if let Some(ref mut owner) = new.owner {
-        curr.owner = std::mem::take(owner);
-    }
+    let keys_modified = curr_keys.update(new);
+    let pref_modified = curr_badge.update(new);
 
-    if let Some(style) = new.style {
-        curr_badge.set_style(style);
-    }
-    if let Some(counter) = new.counter {
-        curr_badge.counter = counter;
-    }
-    if let Some(ref mut label) = new.label {
-        curr_badge.label = std::mem::take(label);
-    }
-    if let Some(color) = new.label_color {
-        curr_badge.label_color = color;
-    }
-    if let Some(color) = new.color {
-        curr_badge.color = color;
-    }
+    let return_res = verify_repo_from(&curr_keys.owner, &curr_keys.repo);
 
-    let return_res = verify_repo_from(&curr.owner, &curr.repo);
-
-    if new.key_modified() {
-        write(curr, INPUT_PATH)?;
+    if keys_modified {
+        write(curr_keys, INPUT_PATH)?;
 
         if let Some(ref prev_id) = new.gist {
             if !prev_id.is_empty() {
@@ -174,7 +198,7 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
         println!("Key(s) updated locally");
     }
 
-    if new.pref_modified() {
+    if pref_modified {
         write(curr_badge, PREFERENCES_PATH)?;
         println!("Badge preference(s) updated")
     }
