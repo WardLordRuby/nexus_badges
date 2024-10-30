@@ -73,7 +73,7 @@ To initialize the automation workflow on your set repository use the `init-acton
 ```
 nexus_badges.exe init-actions
 ```
-The automation workflow is set up to update the remote gist every 8 hours. After a successful `init-actions` there is no need to run it after subsequent `add` or `remove`
+The automation workflow is set up to update the remote gist once a day. After a successful `init-actions` there is no need to run it after subsequent `add` or `remove`
 commands. 
 
 ### Normal usage
