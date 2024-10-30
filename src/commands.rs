@@ -1,10 +1,12 @@
 use crate::{
     check_program_version, conditional_join,
     models::{
+        badge_options::BadgePreferences,
         cli::{Mod, SetArgs, Workflow},
         error::Error,
         json_data::Input,
     },
+    read,
     services::{
         git::{
             create_remote, delete_cache_by_key, get_public_key, set_repository_secret,
@@ -12,8 +14,9 @@ use crate::{
         },
         nexus::update_download_counts,
     },
-    verify_gist, verify_git, verify_repo, write, write_badges, StartupVars, ENV_NAME_GIST_ID,
-    ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, VARS,
+    verify_gist, verify_git, verify_repo, verify_repo_from, write, write_badges, StartupVars,
+    ENV_NAME_GIST_ID, ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, PREFERENCES_PATH,
+    VARS,
 };
 use std::io::{self, ErrorKind};
 
@@ -118,6 +121,7 @@ macro_rules! propagate_err {
 
 pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
     let mut curr = Input::from_file()?;
+    let mut curr_badge = read::<BadgePreferences>(PREFERENCES_PATH).unwrap_or_default();
 
     if let Some(ref mut token) = new.git {
         new.modified.git_token = true;
@@ -138,19 +142,44 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
         curr.owner = std::mem::take(owner);
     }
 
-    write(curr, INPUT_PATH)?;
-
-    if let Some(ref prev_id) = new.gist {
-        if !prev_id.is_empty() {
-            // MARK: XXX
-            // Do we require confirmation for these kind of overwrites?
-            println!("WARN: Previously stored gist_id: {prev_id}, was replaced");
-        }
+    if let Some(style) = new.style {
+        curr_badge.set_style(style);
+    }
+    if let Some(counter) = new.counter {
+        curr_badge.counter = counter;
+    }
+    if let Some(ref mut label) = new.label {
+        curr_badge.label = std::mem::take(label);
+    }
+    if let Some(color) = new.label_color {
+        curr_badge.label_color = color;
+    }
+    if let Some(color) = new.color {
+        curr_badge.color = color;
     }
 
-    println!("Key(s) updated locally");
+    let return_res = verify_repo_from(&curr.owner, &curr.repo);
 
-    verify_repo()
+    if new.key_modified() {
+        write(curr, INPUT_PATH)?;
+
+        if let Some(ref prev_id) = new.gist {
+            if !prev_id.is_empty() {
+                // MARK: XXX
+                // Do we require confirmation for these kind of overwrites?
+                println!("WARN: Previously stored gist_id: {prev_id}, was replaced");
+            }
+        }
+
+        println!("Key(s) updated locally");
+    }
+
+    if new.pref_modified() {
+        write(curr_badge, PREFERENCES_PATH)?;
+        println!("Badge preference(s) updated")
+    }
+
+    return_res
 }
 
 pub async fn update_args_remote(new: SetArgs) -> Result<(), Error> {
@@ -212,8 +241,7 @@ pub async fn process(input_mods: Vec<Mod>, on_remote: bool) -> Result<(), Error>
     }
 
     if !on_remote {
-        let universal_url = prev_remote.universal_url()?;
-        write_badges(output, universal_url)?;
+        write_badges(output, prev_remote.universal_url()?)?;
     }
     Ok(())
 }

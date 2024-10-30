@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod models {
+    pub mod badge_options;
     pub mod cli;
     pub mod error;
     pub mod json_data;
@@ -11,6 +12,7 @@ pub mod services {
 
 use crate::{
     models::{
+        badge_options::BadgePreferences,
         cli::{Commands, Mod},
         error::Error,
         json_data::{GistResponse, Input, ModDetails, Version},
@@ -23,15 +25,18 @@ use std::{
     collections::BTreeMap,
     fmt::Display,
     fs::File,
-    io::{BufRead, BufReader, ErrorKind, Write},
+    io::{BufRead, BufReader, BufWriter, ErrorKind, Write},
     sync::OnceLock,
 };
 
 const IO_DIR: &str = "io";
 pub const INPUT_PATH: &str = "io/input.json";
 pub const OUPUT_PATH: &str = "io/output.json";
+const PREFERENCES_PATH: &str = "io/badge_preferences.json";
 const BADGES_PATH: &str = "io/badges.md";
 const BADGES_PATH_LOCAL: &str = ".\\io\\badges.md";
+
+const BADGE_URL: &str = "https://shields.io/badges/dynamic-json-badge";
 
 const ENV_NAME_NEXUS: &str = "NEXUS_KEY";
 const ENV_NAME_GIT: &str = "GIT_TOKEN";
@@ -43,7 +48,7 @@ pub const CREATED_RESPONSE: u16 = 201;
 pub const UPDATED_RESPONSE: u16 = 204;
 
 const VERSION_URL: &str =
-    "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw/";
+    "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw";
 
 static VARS: OnceLock<StartupVars> = OnceLock::new();
 
@@ -155,9 +160,8 @@ async fn verify_gist() -> Result<(String, GistResponse), Error> {
     Ok((endpoint, meta))
 }
 
-fn verify_repo() -> Result<(), Error> {
-    let vars = VARS.get().expect("set on startup");
-    if vars.repo.is_empty() && vars.owner.is_empty() {
+fn verify_repo_from(owner: &str, repo: &str) -> Result<(), Error> {
+    if repo.is_empty() && owner.is_empty() {
         return Err(Error::NotSetup(
             "No repository set as target location of 'automation.yml' workflow.\n\
             To setup automation workflow use commands:\n\
@@ -165,17 +169,22 @@ fn verify_repo() -> Result<(), Error> {
             - 'nexus_badges.exe init-actions'",
         ));
     }
-    if vars.repo.is_empty() {
+    if repo.is_empty() {
         return Err(Error::Missing(
             "Use command 'set --repo' to input your forked 'nexus_badges'",
         ));
     }
-    if vars.owner.is_empty() {
+    if owner.is_empty() {
         return Err(Error::Missing(
             "Use command 'set --owner' to input your GitHub username",
         ));
     }
     Ok(())
+}
+
+fn verify_repo() -> Result<(), Error> {
+    let vars = VARS.get().expect("set on startup");
+    verify_repo_from(&vars.owner, &vars.repo)
 }
 
 async fn check_program_version() -> reqwest::Result<Option<String>> {
@@ -306,17 +315,44 @@ pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
 // add badge formatter for url, rSt, AsciiDoc, HTML
 
 fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
-    let mut file = File::create(BADGES_PATH)?;
+    let file = File::create(BADGES_PATH)?;
+    let mut writer = BufWriter::new(file);
+
+    let badge_prefs = read::<BadgePreferences>(PREFERENCES_PATH).unwrap_or_else(|err| {
+        match err {
+            Error::Io(err) if err.kind() == ErrorKind::NotFound => (),
+            _ => eprintln!("{err}, using default styling"),
+        }
+        BadgePreferences::default()
+    });
+
     let encoded_url = percent_encode(universal_url.as_bytes(), CUSTOM_ENCODE_SET);
+    let encoded_label = percent_encode(badge_prefs.label.as_bytes(), CUSTOM_ENCODE_SET);
+    let option_fields = badge_prefs.option_fields();
+
+    writeln!(writer, "# Shields.io Badges via Nexus Badges")?;
+    writeln!(writer, "Base template: {BADGE_URL}")?;
+    writeln!(writer, "Data source URL: {universal_url}")?;
+    writeln!(writer, "{badge_prefs}")?;
 
     for (uid, entry) in output.into_iter() {
-        writeln!(file, "<!-- {} -->", entry.name)?;
-        writeln!(file,
-            "[![Nexus Downloads](https://img.shields.io/badge/dynamic/json?url={encoded_url}&query=%24.{uid}.mod_downloads&label=Nexus%20Downloads&labelColor=%2323282e)]({})",
+        let query = format!("$.{uid}.{}", badge_prefs.counter.field_name());
+        let encoded_query = percent_encode(query.as_bytes(), CUSTOM_ENCODE_SET);
+        writeln!(writer, "## {}", entry.name)?;
+        writeln!(writer, "```markdown")?;
+        writeln!(writer,
+            "[![Nexus Downloads](https://img.shields.io/badge/dynamic/json?url={encoded_url}&query={encoded_query}&label={encoded_label}{option_fields})]({})",
             entry.url
         )?;
-        writeln!(file)?;
+        writeln!(writer, "```")?;
+        writeln!(writer)?;
+        writeln!(writer, "Configuration:")?;
+        writeln!(writer, "- Query: {query}")?;
+        writeln!(writer, "- Link: {}", entry.url)?;
+        writeln!(writer)?;
     }
+
+    writer.flush()?;
 
     println!("Badges saved to: {BADGES_PATH_LOCAL}");
     Ok(())
@@ -333,11 +369,21 @@ pub fn await_user_for_end(on_remote: bool) {
 
 const CUSTOM_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')
+    .add(b'!')
+    .add(b'#')
+    .add(b'$')
+    .add(b'%')
+    .add(b'&')
+    .add(b'\'')
+    .add(b'(')
+    .add(b')')
+    .add(b'*')
+    .add(b'+')
+    .add(b',')
     .add(b'"')
     .add(b'<')
     .add(b'>')
     .add(b'`')
-    .add(b'#')
     .add(b'?')
     .add(b'{')
     .add(b'}')

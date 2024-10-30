@@ -1,3 +1,4 @@
+use crate::models::badge_options::{BadgeStyle, Color, DownloadCount};
 use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -88,8 +89,51 @@ pub struct SetArgs {
     #[arg(long)]
     pub repo: Option<String>,
 
+    /// Specify a style to be added to badges [Default: flat]{n}  
+    #[arg(long)]
+    pub style: Option<BadgeStyle>,
+
+    /// Specify download count to use [Default: total]
+    #[arg(long)]
+    pub counter: Option<DownloadCount>,
+
+    /// Specify label to use on badges [Default: 'Nexus Downloads']
+    /// {n}  [Tip: use quotes to include spaces]
+    #[arg(long)]
+    pub label: Option<String>,
+
+    /// Specify a hex color for label side of the badge
+    /// {n}  [Tip: input colors as '#23282e' or 23282e]
+    #[arg(long)]
+    pub label_color: Option<Color>,
+
+    /// Specify a hex color for counter side of the badge
+    /// {n} [Tip: to remove a color set as default]
+    #[arg(long)]
+    pub color: Option<Color>,
+
     #[clap(skip)]
     pub modified: ModFlags,
+}
+
+impl SetArgs {
+    #[inline]
+    pub fn key_modified(&self) -> bool {
+        self.git.is_some()
+            || self.nexus.is_some()
+            || self.gist.is_some()
+            || self.owner.is_some()
+            || self.repo.is_some()
+    }
+
+    #[inline]
+    pub fn pref_modified(&self) -> bool {
+        self.style.is_some()
+            || self.counter.is_some()
+            || self.label.is_some()
+            || self.label_color.is_some()
+            || self.color.is_some()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -97,6 +141,13 @@ pub struct ModFlags {
     pub git_token: bool,
     pub nexus_key: bool,
     pub gist_id: bool,
+}
+
+impl ModFlags {
+    #[inline]
+    pub fn any(&self) -> bool {
+        self.git_token || self.nexus_key || self.gist_id
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]

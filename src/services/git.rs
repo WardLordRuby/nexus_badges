@@ -36,7 +36,7 @@ impl GistResponse {
     pub fn universal_url(&self) -> Result<&str, Error> {
         self.file_details().map(|entry| {
             let i = entry.raw_url.find(RAW).expect("always contains `RAW`");
-            &entry.raw_url[..i + RAW.len()]
+            &entry.raw_url[..i + (RAW.len() - '/'.len_utf8())]
         })
     }
 

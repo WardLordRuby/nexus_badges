@@ -40,6 +40,9 @@ async fn main() {
                     }
                     return;
                 };
+                if !args.modified.any() {
+                    return;
+                }
             }
             _ => (),
         }
