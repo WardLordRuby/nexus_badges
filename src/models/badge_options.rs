@@ -1,8 +1,10 @@
+use crate::URL_ENCODE_SET;
 use clap::ValueEnum;
-use serde::{Deserialize, Serialize};
+use percent_encoding::percent_encode;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::{
-    borrow::Cow,
     fmt::{Debug, Display},
+    str::FromStr,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -11,8 +13,10 @@ pub struct BadgePreferences {
     style: BadgeStyle,
     pub count: DownloadCount,
     pub label: String,
+    #[serde(deserialize_with = "deserialize_color")]
     #[serde(skip_serializing_if = "Color::is_none")]
     pub label_color: Color,
+    #[serde(deserialize_with = "deserialize_color")]
     #[serde(skip_serializing_if = "Color::is_none")]
     pub color: Color,
 }
@@ -23,11 +27,17 @@ impl BadgePreferences {
         if let Some(style) = self.style() {
             output.push_str(&format!("&style={style}"));
         }
-        if let Some(color) = self.label_color.0 {
-            output.push_str(&format!("&labelColor={}", color.percent_encoded_hex()));
+        if let Some(ref color) = self.label_color.0 {
+            output.push_str(&format!(
+                "&labelColor={}",
+                percent_encode(color.as_bytes(), URL_ENCODE_SET)
+            ));
         }
-        if let Some(color) = self.color.0 {
-            output.push_str(&format!("&color={}", color.percent_encoded_hex()));
+        if let Some(ref color) = self.color.0 {
+            output.push_str(&format!(
+                "&color={}",
+                percent_encode(color.as_bytes(), URL_ENCODE_SET)
+            ));
         }
         output
     }
@@ -69,8 +79,8 @@ impl Display for BadgePreferences {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default)]
-pub struct Color(Option<u32>);
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+pub struct Color(Option<String>);
 
 impl Color {
     #[inline]
@@ -81,26 +91,29 @@ impl Color {
 
 impl Display for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(color) = self.0 {
-            return write!(f, "#{color:06x}");
+        write!(f, "{}", self.0.as_deref().unwrap_or("default"))
+    }
+}
+
+fn deserialize_color<'de, D>(deserializer: D) -> Result<Color, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = match String::deserialize(deserializer) {
+        Ok(s) => s,
+        Err(err) => {
+            eprintln!("{err}, Using default color");
+            return Ok(Color::default());
         }
-        write!(f, "default")
-    }
+    };
+    Ok(Color::from_str(&s).unwrap_or_else(|err| {
+        eprintln!("'{s}' is not a valid hex color. Using default color.\n{err}");
+        Color::default()
+    }))
 }
 
-pub trait EncodedHex {
-    fn percent_encoded_hex(&self) -> String;
-}
-
-impl EncodedHex for u32 {
-    #[inline]
-    fn percent_encoded_hex(&self) -> String {
-        format!("%23{self:06x}")
-    }
-}
-
-impl std::str::FromStr for Color {
-    type Err = Cow<'static, str>;
+impl FromStr for Color {
+    type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.eq_ignore_ascii_case("default") {
@@ -110,16 +123,14 @@ impl std::str::FromStr for Color {
         let hex = s.trim_start_matches('#');
 
         if hex.len() != 6 {
-            return Err("Color must be 6 hex digits".into());
+            return Err("Color must be 6 hex digits");
         }
 
         if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Err("Color must contain only hex digits".into());
+            return Err("Color must contain only hex digits");
         }
 
-        u32::from_str_radix(hex, 16)
-            .map(|int| Color(Some(int)))
-            .map_err(|err| format!("Invalid hex color. {err}").into())
+        Ok(Color(Some(format!("#{hex}"))))
     }
 }
 

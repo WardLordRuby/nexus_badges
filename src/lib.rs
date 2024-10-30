@@ -326,8 +326,8 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
         BadgePreferences::default()
     });
 
-    let encoded_url = percent_encode(universal_url.as_bytes(), CUSTOM_ENCODE_SET);
-    let encoded_label = percent_encode(badge_prefs.label.as_bytes(), CUSTOM_ENCODE_SET);
+    let encoded_url = percent_encode(universal_url.as_bytes(), URL_ENCODE_SET);
+    let encoded_label = percent_encode(badge_prefs.label.as_bytes(), URL_ENCODE_SET);
     let option_fields = badge_prefs.option_fields();
 
     writeln!(writer, "# Shields.io Badges via Nexus Badges")?;
@@ -337,7 +337,7 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
 
     for (uid, entry) in output.into_iter() {
         let query = format!("$.{uid}.{}", badge_prefs.count.field_name());
-        let encoded_query = percent_encode(query.as_bytes(), CUSTOM_ENCODE_SET);
+        let encoded_query = percent_encode(query.as_bytes(), URL_ENCODE_SET);
         writeln!(writer, "## {}", entry.name)?;
         writeln!(writer, "```markdown")?;
         writeln!(writer,
@@ -367,7 +367,7 @@ pub fn await_user_for_end(on_remote: bool) {
     }
 }
 
-const CUSTOM_ENCODE_SET: &AsciiSet = &CONTROLS
+pub const URL_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'!')
     .add(b'#')

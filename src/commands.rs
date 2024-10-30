@@ -163,13 +163,13 @@ impl BadgePreferences {
             modified = true;
             self.label = std::mem::take(label);
         }
-        if let Some(color) = from.label_color {
+        if let Some(ref mut color) = from.label_color {
             modified = true;
-            self.label_color = color;
+            self.label_color = std::mem::take(color);
         }
-        if let Some(color) = from.color {
+        if let Some(ref mut color) = from.color {
             modified = true;
-            self.color = color;
+            self.color = std::mem::take(color);
         }
         modified
     }
