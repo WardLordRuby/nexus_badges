@@ -1,11 +1,47 @@
 param(
     [string]$BinaryName = "nexus_badges",
-    [string]$Target = "x86_64-unknown-linux-gnu",    
-    [string]$Version = "1.0.0"
+    [string]$Target = "x86_64-unknown-linux-gnu",
+    [Parameter(Mandatory = $true)]
+    [string]$Version
 )
 
-# Get project root directory (assuming script is in scripts folder)
+# Get project root directory
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+# Ensure BinaryName is linux friendly
+$LinuxBinaryName = $BinaryName.Replace('_', '-')
+
+# Define metadata
+if ($Target -eq "x86_64-unknown-linux-gnu") {
+    $Architecture = "amd64"
+} elseif ($Target -eq "aarch64-unknown-linux-gnu") {
+    $Architecture = "arm64"
+} else {
+    Write-Error "unsupported target"
+    exit 1
+}
+
+$DesktopFile = @"
+[Desktop Entry]
+Version=$Version
+Type=Application
+Name=$LinuxBinaryName
+Comment=Your application description
+Exec=/usr/local/bin/$LinuxBinaryName
+Icon=$LinuxBinaryName
+Categories=Utility;
+Terminal=true
+"@
+
+$ControlFile = @"
+Package: $LinuxBinaryName
+Version: $Version
+Section: utils
+Priority: optional
+Architecture: $Architecture
+Maintainer: WardLordRuby
+Description: Shields.io badge generator for Nexus Mods
+"@
 
 # Change to project root
 Push-Location $ProjectRoot
@@ -13,18 +49,7 @@ Push-Location $ProjectRoot
 try {
     cross build --target $Target --release
 
-    # Set Architecture var
-    if ($Target -eq "x86_64-unknown-linux-gnu") {
-        $Architecture = "amd64"
-    } elseif ($Target -eq "aarch64-unknown-linux-gnu") {
-        $Architecture = "arm64"
-    } else {
-        Write-Error "unsupported target"
-        exit 1
-    }
-
     # Create distribution directory
-    $LinuxBinaryName = $BinaryName.Replace('_', '-')
     $DistDir = "build/temp/dist/linux/$LinuxBinaryName-$Version"
     New-Item -ItemType Directory -Force -Path $DistDir
     New-Item -ItemType Directory -Force -Path "$DistDir/usr/local/bin"
@@ -40,32 +65,11 @@ try {
         "$DistDir/usr/share/icons/hicolor/256x256/apps/$LinuxBinaryName.png"
 
     # Create .desktop file
-@"
-[Desktop Entry]
-Version=$Version
-Type=Application
-Name=$LinuxBinaryName
-Comment=Your application description
-Exec=/usr/local/bin/$LinuxBinaryName
-Icon=$LinuxBinaryName
-Categories=Utility;
-Terminal=true
-"@ | `
-    Out-File -FilePath "$DistDir/usr/share/applications/$LinuxBinaryName.desktop" -Encoding UTF8
+    $DesktopFile | Out-File -FilePath "$DistDir/usr/share/applications/$LinuxBinaryName.desktop" -Encoding UTF8
 
     # Create control file for debian package
     New-Item -ItemType Directory -Force -Path "$DistDir/DEBIAN"
-
-@"
-Package: $LinuxBinaryName
-Version: $Version
-Section: utils
-Priority: optional
-Architecture: $Architecture
-Maintainer: WardLordRuby
-Description: Shields.io badge generator for Nexus Mods
-"@ | `
-    Out-File -FilePath "$DistDir/DEBIAN/control" -Encoding UTF8
+    $ControlFile | Out-File -FilePath "$DistDir/DEBIAN/control" -Encoding UTF8
 
     # Build the Docker image if it doesn't exist
     $ImageName = "deb-builder"
@@ -76,11 +80,11 @@ Description: Shields.io badge generator for Nexus Mods
 
     # Run the container
     if (docker run --rm -v "${PWD}/build/temp:/build/temp" $ImageName -and $?) {
-        # Command succeeded, do something here
-        Write-Host "Done! Package created in dist/linux/"
-    }
+        Write-Host "Done! Package created in target/$Target/release/"
 
-    Move-Item -Path "build/temp/dist/linux/$LinuxBinaryName-$Version.deb" -Destination "target/$Target/release/$LinuxBinaryName-$Version.deb"
+        Move-Item "build/temp/dist/linux/$LinuxBinaryName-$Version.deb" `
+            "target/$Target/release/$LinuxBinaryName-$Version.deb" -Force
+    }
 
 } finally {
     # Force delete (don't ask for confirmation, ignore read-only)
