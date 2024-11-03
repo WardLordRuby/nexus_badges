@@ -61,7 +61,7 @@ try {
         "$DistDir/usr/local/bin/$LinuxBinaryName"
 
     # Copy icon
-    Copy-Item "assets/Icon.png" `
+    Copy-Item "assets/Icon_256.png" `
         "$DistDir/usr/share/icons/hicolor/256x256/apps/$LinuxBinaryName.png"
 
     # Create .desktop file
@@ -87,7 +87,7 @@ try {
     }
 
 } finally {
-    # Force delete (don't ask for confirmation, ignore read-only)
+    # Delete temp directory
     Remove-Item -Path "build/temp" -Recurse -Force
 
     Pop-Location
