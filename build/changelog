@@ -1,0 +1,7 @@
+nexus-badges (0.3.1) stable; urgency=low
+
+  * Added new badge types for Nexus Mods.
+  * Added badge style customization.
+  * Added deb package for linux.
+
+ -- WardLordRuby <@7thWardLord Discord>  Fri, 03 Nov 2024 12:34:56 +0000

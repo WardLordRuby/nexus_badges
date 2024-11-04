@@ -26,7 +26,6 @@ $DesktopFile = @"
 Version=$Version
 Type=Application
 Name=$LinuxBinaryName
-Comment=Your application description
 Exec=/usr/local/bin/$LinuxBinaryName
 Icon=$LinuxBinaryName
 Categories=Utility;
@@ -41,6 +40,24 @@ Priority: optional
 Architecture: $Architecture
 Maintainer: WardLordRuby
 Description: Shields.io badge generator for Nexus Mods
+"@
+
+$PostRM = @"
+#!/bin/sh
+set -e
+
+case "`$1" in
+    purge)
+        for user in `$(getent passwd | awk -F: '`$3 >= 1000' | cut -d: -f6); do
+            config_dir="`$user/.config/$LinuxBinaryName"
+            if [ -d "`$config_dir" ]; then
+                rm -rf "`$config_dir"
+            fi
+        done
+        ;;
+esac
+
+exit 0
 "@
 
 # Change to project root
@@ -65,11 +82,17 @@ try {
         "$DistDir/usr/share/icons/hicolor/256x256/apps/$LinuxBinaryName.png"
 
     # Create .desktop file
-    $DesktopFile | Out-File -FilePath "$DistDir/usr/share/applications/$LinuxBinaryName.desktop" -Encoding UTF8
+    $DesktopFile -replace "`r", "" | Out-File -FilePath "$DistDir/usr/share/applications/$LinuxBinaryName.desktop" -Encoding UTF8
 
     # Create control file for debian package
     New-Item -ItemType Directory -Force -Path "$DistDir/DEBIAN"
-    $ControlFile | Out-File -FilePath "$DistDir/DEBIAN/control" -Encoding UTF8
+    $ControlFile -replace "`r", "" | Out-File -FilePath "$DistDir/DEBIAN/control" -Encoding UTF8
+
+    # Create postrm purge script
+    $PostRM -replace "`r", "" | Out-File -FilePath "$DistDir/DEBIAN/postrm" -Encoding UTF8
+
+    # Copy changelog
+    Copy-Item "build/changelog" "$DistDir/DEBIAN/changelog"
 
     # Build the Docker image if it doesn't exist
     $ImageName = "deb-builder"
