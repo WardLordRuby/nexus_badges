@@ -82,14 +82,14 @@ try {
         "$DistDir/usr/share/icons/hicolor/256x256/apps/$LinuxBinaryName.png"
 
     # Create .desktop file
-    $DesktopFile -replace "`r", "" | Out-File -FilePath "$DistDir/usr/share/applications/$LinuxBinaryName.desktop" -Encoding UTF8
+    $DesktopFile | Out-File -FilePath "$DistDir/usr/share/applications/$LinuxBinaryName.desktop" -Encoding UTF8
 
     # Create control file for debian package
     New-Item -ItemType Directory -Force -Path "$DistDir/DEBIAN"
-    $ControlFile -replace "`r", "" | Out-File -FilePath "$DistDir/DEBIAN/control" -Encoding UTF8
+    $ControlFile | Out-File -FilePath "$DistDir/DEBIAN/control" -Encoding UTF8
 
     # Create postrm purge script
-    $PostRM -replace "`r", "" | Out-File -FilePath "$DistDir/DEBIAN/postrm" -Encoding UTF8
+    $PostRM | Out-File -FilePath "$DistDir/DEBIAN/postrm" -Encoding UTF8
 
     # Copy changelog
     Copy-Item "build/changelog" "$DistDir/DEBIAN/changelog"

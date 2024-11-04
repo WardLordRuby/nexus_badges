@@ -1,5 +1,6 @@
 nexus-badges (0.3.1) stable; urgency=low
 
+  * Overhaul to 'badges.md' output format.
   * Added new badge types for Nexus Mods.
   * Added badge style customization.
   * Added deb package for linux.
