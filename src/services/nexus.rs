@@ -1,6 +1,6 @@
 use crate::{
     models::{cli::Mod, error::Error, json_data::ModDetails},
-    verify_added, verify_nexus, write, INPUT_PATH, OK_RESPONSE, OUPUT_PATH, VARS,
+    verify_added, verify_nexus, write, OK_RESPONSE, PATHS, VARS,
 };
 use std::{
     collections::BTreeMap,
@@ -49,7 +49,7 @@ pub async fn update_download_counts(
                     while tasks.join_next().await.is_some() {}
                     return Err(Error::Io(io::Error::new(
                         ErrorKind::InvalidInput,
-                        format!("duplicate tracked mod: {}, in: {INPUT_PATH}", dup.name),
+                        format!("duplicate tracked mod: {}, in: {}", dup.name, PATHS.input),
                     )));
                 }
             }
@@ -65,7 +65,7 @@ pub async fn update_download_counts(
     println!("Retrieved download counts from Nexus Mods");
 
     if !on_remote {
-        write(output.clone(), OUPUT_PATH)?;
+        write(output.clone(), &PATHS.output)?;
         println!("Download counts saved locally for {} mod(s)", output.len());
     }
 

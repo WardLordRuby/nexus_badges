@@ -15,8 +15,7 @@ use crate::{
         nexus::update_download_counts,
     },
     verify_gist, verify_git, verify_repo, verify_repo_from, write, write_badges, StartupVars,
-    ENV_NAME_GIST_ID, ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, INPUT_PATH, PREFERENCES_PATH,
-    VARS,
+    ENV_NAME_GIST_ID, ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, PATHS, VARS,
 };
 use std::io::{self, ErrorKind};
 
@@ -65,11 +64,11 @@ impl Update for Vec<Mod> {
             serde_json::to_string(&self.clone()).expect("`Vec<Mod>` is always ok to stringify")
         });
         let updated = Input::from(VARS.get().expect("set on startup"), self);
-        write(updated, INPUT_PATH)?;
+        write(updated, &PATHS.input)?;
 
         if let Some(new_variable) = new_mod_json {
             if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
-                println!("{INPUT_PATH} updated locally");
+                println!("{} updated locally", PATHS.input);
                 return Err(err);
             }
         }
@@ -83,7 +82,7 @@ impl Modify for Vec<Mod> {
         if self.contains(&details) {
             return Err(Error::Io(io::Error::new(
                 ErrorKind::InvalidInput,
-                format!("Mod already exists in: {INPUT_PATH}"),
+                format!("Mod already exists in: {}", PATHS.input),
             )));
         }
         self.push(details);
@@ -100,7 +99,7 @@ impl Modify for Vec<Mod> {
             .ok_or_else(|| {
                 Error::Io(io::Error::new(
                     ErrorKind::InvalidInput,
-                    format!("Mod does not exist in: {INPUT_PATH}"),
+                    format!("Mod does not exist in: {}", PATHS.input),
                 ))
             })?;
         self.swap_remove(i);
@@ -177,7 +176,7 @@ impl BadgePreferences {
 
 pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
     let mut curr_keys = Input::from_file()?;
-    let mut curr_badge = read::<BadgePreferences>(PREFERENCES_PATH).unwrap_or_default();
+    let mut curr_badge = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_default();
 
     let keys_modified = curr_keys.update(new);
     let pref_modified = curr_badge.update(new);
@@ -185,7 +184,7 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
     let return_res = verify_repo_from(&curr_keys.owner, &curr_keys.repo);
 
     if keys_modified {
-        write(curr_keys, INPUT_PATH)?;
+        write(curr_keys, &PATHS.input)?;
 
         if let Some(ref prev_id) = new.gist {
             if !prev_id.is_empty() {
@@ -199,7 +198,7 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
     }
 
     if pref_modified {
-        write(curr_badge, PREFERENCES_PATH)?;
+        write(curr_badge, &PATHS.preferences)?;
         println!("Badge preference(s) updated")
     }
 
@@ -282,7 +281,7 @@ pub async fn init_remote(input_mods: Vec<Mod>) -> Result<(), Error> {
     println!("New gist_id: {}", meta.id);
 
     std::mem::swap(&mut input.gist_id, &mut meta.id);
-    write(input, INPUT_PATH)?;
+    write(input, &PATHS.input)?;
 
     if swapped_old {
         println!("Previous gist_id: {}, was replaced", meta.id);

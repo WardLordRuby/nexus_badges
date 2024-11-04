@@ -218,6 +218,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
+name = "constcat"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4938185353434999ef52c81753c8cca8955ed38042fc29913db3751916f3b7ab"
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -733,6 +739,7 @@ version = "0.3.0"
 dependencies = [
  "base64",
  "clap",
+ "constcat",
  "crypto_box",
  "percent-encoding",
  "reqwest",

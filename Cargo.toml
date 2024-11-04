@@ -11,6 +11,7 @@ ProductVersion = "0.3.0"
 [dependencies]
 base64 = "0.22.1"
 clap = { version = "4.5.20", features = ["derive"] }
+constcat = "0.5.1"
 crypto_box = { version = "0.9.1", features = ["seal"] }
 percent-encoding = "2.3.1"
 reqwest = { version = "0.12.8", features = ["json", "native-tls-vendored"] }

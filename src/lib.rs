@@ -19,22 +19,25 @@ use crate::{
     },
     services::git::{get_remote, gist_id_endpoint},
 };
+use constcat::concat;
 use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
     fmt::Display,
     fs::File,
     io::{BufRead, BufReader, BufWriter, ErrorKind, Write},
-    sync::OnceLock,
+    sync::{LazyLock, OnceLock},
 };
 
-const IO_DIR: &str = "io";
-pub const INPUT_PATH: &str = "io/input.json";
-pub const OUPUT_PATH: &str = "io/output.json";
-const PREFERENCES_PATH: &str = "io/badge_preferences.json";
-const BADGES_PATH: &str = "io/badges.md";
-const BADGES_PATH_LOCAL: &str = ".\\io\\badges.md";
+const DEFAULT_IO_DIR_NAME: &str = "io";
+const INPUT_FILE_NAME: &str = "input.json";
+const OUTPUT_FILE_NAME: &str = "output.json";
+const PREFERENCES_FILE_NAME: &str = "badge_preferences.json";
+const BADGES_FILE_NAME: &str = "badges.md";
+
+pub static PATHS: LazyLock<FilePaths> = LazyLock::new(init_paths);
 
 const BADGE_URL: &str = "https://shields.io/badges/dynamic-json-badge";
 
@@ -87,6 +90,51 @@ macro_rules! print_err {
     ($result:expr) => {
         $result.unwrap_or_else(|err| eprintln!("{err}"))
     };
+}
+
+pub struct FilePaths {
+    pub input: Cow<'static, str>,
+    pub output: Cow<'static, str>,
+    pub badges: Cow<'static, str>,
+    pub preferences: Cow<'static, str>,
+}
+
+#[cfg(target_os = "linux")]
+fn init_paths() -> FilePaths {
+    const DEB_INSTALL: &str = "usr/local/bin";
+
+    let mut exe_dir = std::env::current_exe().expect("Could not locate executable");
+    exe_dir.pop();
+
+    if !exe_dir.ends_with(DEB_INSTALL) {
+        return FilePaths::default();
+    }
+    let crate_name_linux = env!("CARGO_PKG_NAME").replace('_', "-");
+    let home = std::env::var("HOME").expect("valid var on linux");
+    let base = format!("{home}/.config/{crate_name_linux}");
+
+    FilePaths {
+        input: Cow::Owned(format!("{base}/{INPUT_FILE_NAME}")),
+        output: Cow::Owned(format!("{base}/{OUTPUT_FILE_NAME}")),
+        badges: Cow::Owned(format!("{home}/Documents/{BADGES_FILE_NAME}")),
+        preferences: Cow::Owned(format!("{base}/{PREFERENCES_FILE_NAME}")),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn init_paths() -> FilePaths {
+    FilePaths::default()
+}
+
+impl Default for FilePaths {
+    fn default() -> Self {
+        FilePaths {
+            input: Cow::Borrowed(concat!(DEFAULT_IO_DIR_NAME, "/", INPUT_FILE_NAME)),
+            output: Cow::Borrowed(concat!(DEFAULT_IO_DIR_NAME, "/", OUTPUT_FILE_NAME)),
+            badges: Cow::Borrowed(concat!(DEFAULT_IO_DIR_NAME, "/", BADGES_FILE_NAME)),
+            preferences: Cow::Borrowed(concat!(DEFAULT_IO_DIR_NAME, "/", PREFERENCES_FILE_NAME)),
+        }
+    }
 }
 
 impl Display for Commands {
@@ -247,12 +295,12 @@ impl Input {
     }
 
     fn from_file() -> Result<Self, Error> {
-        match read(INPUT_PATH) {
+        match read(&PATHS.input) {
             Ok(data) => Ok(data),
             Err(err) => match err {
                 Error::Io(err) if err.kind() == ErrorKind::NotFound => {
                     eprintln!(
-                        "Could not find: {INPUT_PATH}. Continuing with default data structure"
+                        "Could not find: {INPUT_FILE_NAME}. Continuing with default data structure"
                     );
                     Ok(Input::default())
                 }
@@ -284,8 +332,17 @@ pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
         });
     }
 
-    if !std::fs::exists(IO_DIR)? {
-        std::fs::create_dir(IO_DIR)?;
+    let config_dir = PATHS.input.rsplit_once('/').expect("has forward slash").0;
+    if !std::fs::exists(config_dir)? {
+        std::fs::create_dir(config_dir)?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let output_dir = PATHS.badges.rsplit_once('/').expect("has forward slash").0;
+        if !std::fs::exists(output_dir)? {
+            std::fs::create_dir(output_dir)?;
+        }
     }
 
     let mut input = if on_remote {
@@ -315,10 +372,10 @@ pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
 // add badge formatter for url, rSt, AsciiDoc, HTML
 
 fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
-    let file = File::create(BADGES_PATH)?;
+    let file = File::create(&*PATHS.badges)?;
     let mut writer = BufWriter::new(file);
 
-    let badge_prefs = read::<BadgePreferences>(PREFERENCES_PATH).unwrap_or_else(|err| {
+    let badge_prefs = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_else(|err| {
         match err {
             Error::Io(err) if err.kind() == ErrorKind::NotFound => (),
             _ => eprintln!("{err}, using default styling"),
@@ -354,7 +411,7 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
 
     writer.flush()?;
 
-    println!("Badges saved to: {BADGES_PATH_LOCAL}");
+    println!("Badges saved to: {}", PATHS.badges);
     Ok(())
 }
 
