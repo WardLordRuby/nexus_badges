@@ -27,7 +27,7 @@ use std::{
     collections::BTreeMap,
     fmt::Display,
     fs::File,
-    io::{BufRead, BufReader, BufWriter, ErrorKind, Write},
+    io::{self, BufRead, BufReader, BufWriter, ErrorKind, Write},
     sync::{LazyLock, OnceLock},
 };
 
@@ -103,7 +103,17 @@ pub struct FilePaths {
 fn init_paths() -> FilePaths {
     const DEB_INSTALL: &str = "usr/local/bin";
 
-    let mut exe_dir = std::env::current_exe().expect("Could not locate executable");
+    let mut exe_dir = match std::env::current_exe() {
+        Ok(dir) => dir,
+        Err(err) => {
+            eprintln!(
+                "Could not locate executable, {err}\n\
+                Using executable local paths for input + output"
+            );
+            return FilePaths::default();
+        }
+    };
+
     exe_dir.pop();
 
     if !exe_dir.ends_with(DEB_INSTALL) {
@@ -122,12 +132,12 @@ fn init_paths() -> FilePaths {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn init_paths() -> FilePaths {
+const fn init_paths() -> FilePaths {
     FilePaths::default()
 }
 
-impl Default for FilePaths {
-    fn default() -> Self {
+impl FilePaths {
+    const fn default() -> Self {
         FilePaths {
             input: Cow::Borrowed(concat!(DEFAULT_IO_DIR_NAME, "/", INPUT_FILE_NAME)),
             output: Cow::Borrowed(concat!(DEFAULT_IO_DIR_NAME, "/", OUTPUT_FILE_NAME)),
@@ -321,17 +331,7 @@ impl Input {
     }
 }
 
-pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
-    if !on_remote {
-        tokio::task::spawn(async {
-            match check_program_version().await {
-                Ok(Some(msg)) => println!("{msg}"),
-                Ok(None) => (),
-                Err(err) => eprintln!("{err}"),
-            }
-        });
-    }
-
+fn prep_io_paths() -> io::Result<()> {
     let config_dir = PATHS.input.rsplit_once('/').expect("has forward slash").0;
     if !std::fs::exists(config_dir)? {
         std::fs::create_dir(config_dir)?;
@@ -344,6 +344,21 @@ pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
             std::fs::create_dir(output_dir)?;
         }
     }
+    Ok(())
+}
+
+pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
+    if !on_remote {
+        tokio::task::spawn(async {
+            match check_program_version().await {
+                Ok(Some(msg)) => println!("{msg}"),
+                Ok(None) => (),
+                Err(err) => eprintln!("{err}"),
+            }
+        });
+    }
+
+    prep_io_paths()?;
 
     let mut input = if on_remote {
         Input::from_env()
@@ -418,7 +433,7 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
 pub fn await_user_for_end(on_remote: bool) {
     if !on_remote {
         println!("Press enter to exit...");
-        let stdin = std::io::stdin();
+        let stdin = io::stdin();
         let mut reader = BufReader::new(stdin);
         let _ = reader.read_line(&mut String::new());
     }

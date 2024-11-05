@@ -23,10 +23,6 @@ async fn main() {
             Commands::Version => {
                 return_after!(version(cli.remote).await, cli.remote);
             }
-            Commands::Automation { state } => {
-                unsupported!(command, on_remote, cli.remote);
-                return_after!(set_workflow_state(*state).await, cli.remote);
-            }
             Commands::UpdateCacheKey { old, new } => {
                 unsupported!(command, on_local, cli.remote);
                 return_after!(update_cache_key(old.as_deref(), new).await, cli.remote);
@@ -68,8 +64,8 @@ async fn main() {
             Commands::Remove(details) => print_err!(input_mods.remove_mod(details).await),
             Commands::Init => print_err!(init_remote(input_mods).await),
             Commands::InitActions => print_err!(init_actions(input_mods).await),
+            Commands::Automation { state } => print_err!(set_workflow_state(state).await),
             Commands::UpdateCacheKey { old: _, new: _ } => unreachable!("by repo-variable guard"),
-            Commands::Automation { state: _ } => unreachable!("by automation guard"),
             Commands::Version => unreachable!("by version guard"),
         }
     } else {
