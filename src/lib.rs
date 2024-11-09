@@ -99,9 +99,9 @@ pub struct FilePaths {
     pub preferences: Cow<'static, str>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn init_paths() -> FilePaths {
-    const DEB_INSTALL: &str = "usr/local/bin";
+    const UNIX_INSTALL: &str = "usr/local/bin";
 
     let mut exe_dir = match std::env::current_exe() {
         Ok(dir) => dir,
@@ -116,12 +116,17 @@ fn init_paths() -> FilePaths {
 
     exe_dir.pop();
 
-    if !exe_dir.ends_with(DEB_INSTALL) {
+    if !exe_dir.ends_with(UNIX_INSTALL) {
         return FilePaths::default();
     }
-    let crate_name_linux = env!("CARGO_PKG_NAME").replace('_', "-");
-    let home = std::env::var("HOME").expect("valid var on linux");
-    let base = format!("{home}/.config/{crate_name_linux}");
+    let crate_name_unix = env!("CARGO_PKG_NAME").replace('_', "-");
+    let home = std::env::var("HOME").expect("valid var on unix");
+
+    #[cfg(target_os = "linux")]
+    let base = format!("{home}/.config/{crate_name_unix}");
+
+    #[cfg(target_os = "macos")]
+    let base = format!("{home}/.local/config/{crate_name_unix}");
 
     FilePaths {
         input: Cow::Owned(format!("{base}/{INPUT_FILE_NAME}")),
@@ -131,7 +136,7 @@ fn init_paths() -> FilePaths {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 const fn init_paths() -> FilePaths {
     FilePaths::default()
 }
@@ -334,14 +339,14 @@ impl Input {
 fn prep_io_paths() -> io::Result<()> {
     let config_dir = PATHS.input.rsplit_once('/').expect("has forward slash").0;
     if !std::fs::exists(config_dir)? {
-        std::fs::create_dir(config_dir)?;
+        std::fs::create_dir_all(config_dir)?;
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         let output_dir = PATHS.badges.rsplit_once('/').expect("has forward slash").0;
         if !std::fs::exists(output_dir)? {
-            std::fs::create_dir(output_dir)?;
+            std::fs::create_dir_all(output_dir)?;
         }
     }
     Ok(())
@@ -387,7 +392,7 @@ pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
 // add badge formatter for url, rSt, AsciiDoc, HTML
 
 fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
-    let file = File::create(&*PATHS.badges)?;
+    let file = File::create(PATHS.badges.as_ref())?;
     let mut writer = BufWriter::new(file);
 
     let badge_prefs = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_else(|err| {

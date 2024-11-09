@@ -96,7 +96,7 @@ cat > "$DIST_DIR/distribution.xml" << EOF
     <title>$APP_NAME_DISPLAY</title>
     <background file="Icon.png" mime-type="image/png" alignment="bottomleft"/>
     <background-darkAqua file="Icon.png" mime-type="image/png" alignment="bottomleft"/>
-    <options require-scripts="false"/>
+    <options customize="never" require-scripts="false"/>
     <choices-outline>
         <line choice="default"/>
     </choices-outline>
