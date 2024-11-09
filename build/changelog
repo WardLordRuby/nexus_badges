@@ -1,8 +1,10 @@
-nexus-badges (0.3.1) stable; urgency=low
+nexus-badges (0.3.1) stable; urgency=medium
 
   * Overhaul to 'badges.md' output format.
   * Added new badge types for Nexus Mods.
   * Added badge style customization.
   * Added deb package for linux.
+  * Added pkg install for macOS.
+  * Fixed a bug that caused the automation set state command to not work
 
  -- WardLordRuby <@7thWardLord Discord>  Fri, 03 Nov 2024 12:34:56 +0000

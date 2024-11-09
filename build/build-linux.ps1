@@ -5,9 +5,6 @@ param(
     [string]$Version
 )
 
-# Get project root directory
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
-
 # Ensure BinaryName is linux friendly
 $LinuxBinaryName = $BinaryName.Replace('_', '-')
 
@@ -61,9 +58,10 @@ exit 0
 "@
 
 # Change to project root
-Push-Location $ProjectRoot
+Push-Location (Split-Path -Parent $PSScriptRoot)
 
 try {
+    # Build binary in release mode for desired target
     cross build --target $Target --release
 
     # Create distribution directory
