@@ -32,6 +32,12 @@ if [ -z "$VERSION" ]; then
     usage
 fi
 
+# Verify target
+if [[ "$TARGET" != "x86_64-apple-darwin" && "$TARGET" != "aarch64-apple-darwin" ]]; then
+    echo "Error: Unsupported target"
+    exit 1
+fi
+
 # Format the app name
 APP_NAME=$(echo "$BINARY_NAME" | sed 's/_/-/g')
 APP_NAME_DISPLAY=$(echo "$BINARY_NAME" | sed 's/[_-]/ /g' | awk '{for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1')
@@ -56,6 +62,7 @@ mkdir -p "$DIST_DIR/Resources"
 cp "assets/Icon.png" "$DIST_DIR/Resources/"
 sips -z 220 220 --padToHeightWidth 275 250 "$DIST_DIR/Resources/Icon.png"
 
+# Create conclusion.html 
 cat > "$DIST_DIR/Resources/conclusion.html" << EOF
 <!DOCTYPE html>
 <html>
@@ -80,7 +87,6 @@ cat > "$DIST_DIR/Resources/conclusion.html" << EOF
 </head>
 <body>
     <h1>The installation was successful.</h1>
-    
     <div class="custom-message">
         <p>$APP_NAME_DISPLAY was successfully installed. You can now use the app from the command line.</p>
         <p>For help use '$APP_NAME --help' or refer to the documentation at <a href="https://github.com/WardLordRuby/nexus_badges">github.com/WardLordRuby/nexus_badges</a>.</p>
@@ -125,6 +131,7 @@ productbuild \
 echo "Creating DMG..."
 hdiutil create -volname "$APP_NAME_DISPLAY" -srcfolder "$DIST_DIR/$APP_NAME.pkg" -ov -format UDZO "target/$TARGET/release/$PKG_NAME.dmg"
 
+# Remove tmp directory
 rm -rf "build/tmp"
 
 echo "Done! Created target/$TARGET/release$PKG_NAME.dmg"

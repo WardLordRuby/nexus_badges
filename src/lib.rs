@@ -119,14 +119,20 @@ fn init_paths() -> FilePaths {
     if !exe_dir.ends_with(UNIX_INSTALL) {
         return FilePaths::default();
     }
-    let crate_name_unix = env!("CARGO_PKG_NAME").replace('_', "-");
+
     let home = std::env::var("HOME").expect("valid var on unix");
 
     #[cfg(target_os = "linux")]
-    let base = format!("{home}/.config/{crate_name_unix}");
+    let base = format!(
+        "{home}/.config/{}",
+        env!("CARGO_PKG_NAME").replace('_', "-")
+    );
 
     #[cfg(target_os = "macos")]
-    let base = format!("{home}/.local/config/{crate_name_unix}");
+    let base = format!(
+        "{home}/Library/{}",
+        capital_camel_case(env!("CARGO_PKG_NAME"))
+    );
 
     FilePaths {
         input: Cow::Owned(format!("{base}/{INPUT_FILE_NAME}")),
@@ -150,6 +156,32 @@ impl FilePaths {
             preferences: Cow::Borrowed(concat!(DEFAULT_IO_DIR_NAME, "/", PREFERENCES_FILE_NAME)),
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn capital_camel_case(input: &str) -> String {
+    let mut capilize_next = false;
+    let separators = ['-', '_'];
+    let input = input.to_lowercase();
+    input
+        .trim()
+        .trim_matches(separators)
+        .char_indices()
+        .filter_map(|(i, ch)| {
+            if i == 0 {
+                return Some(ch.to_ascii_uppercase());
+            }
+            if ch.is_whitespace() || separators.iter().any(|&s| s == ch) {
+                capilize_next = true;
+                return None;
+            }
+            if capilize_next {
+                capilize_next = false;
+                return Some(ch.to_ascii_uppercase());
+            }
+            Some(ch)
+        })
+        .collect()
 }
 
 impl Display for Commands {
