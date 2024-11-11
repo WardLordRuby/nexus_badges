@@ -41,6 +41,7 @@ fi
 # Format the app name
 APP_NAME=$(echo "$BINARY_NAME" | sed 's/_/-/g')
 APP_NAME_DISPLAY=$(echo "$BINARY_NAME" | sed 's/[_-]/ /g' | awk '{for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1')
+APP_NAME_CC=$(echo "$APP_NAME_DISPLAY" | sed 's/ //g')
 PKG_NAME="${APP_NAME}-${VERSION}"
 
 # Build release version
@@ -53,6 +54,10 @@ PAYLOAD_DIR="$DIST_DIR/payload"
 rm -rf "build/tmp"
 mkdir -p "$PAYLOAD_DIR"
 
+# Define paths and file names
+INSTALL_DIR="/usr/local/bin"
+UNINSTALL_SCRIPT="uninstall-$APP_NAME"
+
 # Copy binary to payload directory
 cp "target/$TARGET/release/$BINARY_NAME" "$PAYLOAD_DIR/$APP_NAME"
 chmod +x "$PAYLOAD_DIR/$APP_NAME"
@@ -62,6 +67,87 @@ mkdir -p "$DIST_DIR/Resources"
 cp "assets/Icon.png" "$DIST_DIR/Resources/"
 sips -z 220 220 --padToHeightWidth 275 250 "$DIST_DIR/Resources/Icon.png"
 
+# Create uninstall script
+cat > "$PAYLOAD_DIR/$UNINSTALL_SCRIPT" << EOF
+#!/bin/bash
+set -e
+
+# Define colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+# Define paths
+EXECUTABLE_PATH="$INSTALL_DIR/$APP_NAME"
+UNINSTALLER_PATH="$INSTALL_DIR/$UNINSTALL_SCRIPT"
+CONFIG_DIR="\$HOME/Library/$APP_NAME_CC"
+
+# Function to print with color
+print_status() {
+    echo -e "\${GREEN}\$1\${NC}"
+}
+
+print_error() {
+    echo -e "\${RED}\$1\${NC}"
+}
+
+# Check if executable exists
+if [ ! -f "\$EXECUTABLE_PATH" ]; then
+    print_error "Executable not found at \$EXECUTABLE_PATH"
+    exit 1
+fi
+
+# Check if executable exists
+if [ ! -f "\$EXECUTABLE_PATH" ]; then
+    print_error "Executable not found at \$EXECUTABLE_PATH"
+    exit 1
+fi
+
+# Remove executable
+print_status "Removing executable..."
+sudo rm "\$EXECUTABLE_PATH"
+if [ \$? -eq 0 ]; then
+    print_status "✓ Executable removed successfully"
+else
+    print_error "Failed to remove executable"
+    exit 1
+fi
+
+# Ask about config files
+if [ -d "\$CONFIG_DIR" ]; then
+    echo
+    read -p "Do you want to remove configuration files as well? (y/N) " -n 1 -r
+    echo
+    if [[ \$REPLY =~ ^[Yy]$ ]]; then
+        print_status "Removing configuration directory..."
+        rm -rf "\$CONFIG_DIR"
+        if [ \$? -eq 0 ]; then
+            print_status "✓ Configuration directory removed successfully"
+        else
+            print_error "Failed to remove configuration directory"
+            exit 1
+        fi
+    else
+        print_status "Configuration directory preserved at \$CONFIG_DIR"
+    fi
+fi
+
+# Remove executable
+print_status "Removing uninstaller..."
+sudo rm "\$UNINSTALLER_PATH"
+if [ \$? -eq 0 ]; then
+    print_status "✓ Uninstaller removed successfully"
+else
+    print_error "Failed to remove executable"
+    exit 1
+fi
+
+print_status "Uninstallation completed successfully!"
+EOF
+
+# Make uninstaller executable
+chmod +x "$PAYLOAD_DIR/$UNINSTALL_SCRIPT"
+
 # Create conclusion.html 
 cat > "$DIST_DIR/Resources/conclusion.html" << EOF
 <!DOCTYPE html>
@@ -69,7 +155,7 @@ cat > "$DIST_DIR/Resources/conclusion.html" << EOF
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <style>
-        body { 
+        body {
             font-family: -apple-system;
             margin: 0;
             padding: 20px;
@@ -90,6 +176,7 @@ cat > "$DIST_DIR/Resources/conclusion.html" << EOF
     <div class="custom-message">
         <p>$APP_NAME_DISPLAY was successfully installed. You can now use the app from the command line.</p>
         <p>For help use '$APP_NAME --help' or refer to the documentation at <a href="https://github.com/WardLordRuby/nexus_badges">github.com/WardLordRuby/nexus_badges</a>.</p>
+        <p>To uninstall use '$UNINSTALL_SCRIPT'
     </div>
 </body>
 </html>
@@ -114,11 +201,11 @@ cat > "$DIST_DIR/distribution.xml" << EOF
 </installer-gui-script>
 EOF
 
-# Create package installer
+# Create package pkg
 pkgbuild \
-  --identifier "com.$APP_NAME.pkg" \
+  --identifier "com.$APP_NAME.payload" \
   --root "$PAYLOAD_DIR" \
-  --install-location "/usr/local/bin" \
+  --install-location "$INSTALL_DIR" \
   "$DIST_DIR/$PKG_NAME.pkg"
 
 productbuild \

@@ -65,7 +65,7 @@ try {
     cross build --target $Target --release
 
     # Create distribution directory
-    $DistDir = "build/temp/dist/linux/$LinuxBinaryName-$Version"
+    $DistDir = "build/tmp/dist/linux/$LinuxBinaryName-$Version"
     New-Item -ItemType Directory -Force -Path $DistDir
     New-Item -ItemType Directory -Force -Path "$DistDir/usr/local/bin"
     New-Item -ItemType Directory -Force -Path "$DistDir/usr/share/applications"
@@ -100,16 +100,16 @@ try {
     }
 
     # Run the container
-    if (docker run --rm -v "${PWD}/build/temp:/build/temp" $ImageName -and $?) {
+    if (docker run --rm -v "${PWD}/build/tmp:/build/tmp" $ImageName -and $?) {
         Write-Host "Done! Package created in target/$Target/release/"
 
-        Move-Item "build/temp/dist/linux/$LinuxBinaryName-$Version.deb" `
+        Move-Item "build/tmp/dist/linux/$LinuxBinaryName-$Version.deb" `
             "target/$Target/release/$LinuxBinaryName-$Version.deb" -Force
     }
 
 } finally {
-    # Delete temp directory
-    Remove-Item -Path "build/temp" -Recurse -Force
+    # Delete tmp directory
+    Remove-Item -Path "build/tmp" -Recurse -Force
 
     Pop-Location
 }
