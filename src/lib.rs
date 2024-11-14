@@ -434,7 +434,7 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
 
     let encoded_json_url = percent_encode(universal_url.as_bytes(), URL_ENCODE_SET);
     let encoded_label = percent_encode(badge_prefs.label.as_bytes(), URL_ENCODE_SET);
-    let option_fields = badge_prefs.option_fields(URL_ENCODE_SET);
+    let encoded_optionals = badge_prefs.option_fields(URL_ENCODE_SET);
 
     writeln!(writer, "# Shields.io Badges via Nexus Badges")?;
     writeln!(writer, "Base template: {BADGE_URL}")?;
@@ -448,8 +448,12 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
         badge_prefs.format.write_badge(
             &mut writer,
             URL_ENCODE_SET,
-            &EncodedFields::new(&encoded_json_url, &encoded_query, &encoded_label),
-            &option_fields,
+            &EncodedFields::new(
+                &encoded_json_url,
+                &encoded_query,
+                &encoded_label,
+                &encoded_optionals,
+            ),
             &entry.url,
         )?;
         writeln!(writer)?;
