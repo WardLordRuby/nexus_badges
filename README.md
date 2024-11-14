@@ -60,6 +60,20 @@ To track the download count of a nexus mod use the `add` command. Mods are track
 ```
 nexus_badges.exe add --domain eldenring --mod-id 4825
 ```
+Customize the badge output formatting and styling by using the following `set-arg`'s  
+
+<div align="center">
+    
+  | Flag                        | Description                                                                                       |
+  |-----------------------------|---------------------------------------------------------------------------------------------------|
+  | `--style`                   | Badge style [Default: flat] [possible values: flat, flat-square, plastic, for-the-badge, social]  |
+  | `--count`                   | Count to display [Default: total] [possible values: total, unique]                                |
+  | `--label`                   | Badge label [Default: 'Nexus Downloads']                                                          |
+  | `--color` & `--label-color` | Hex color for each side of the badge [Tip: input colors as `'#23282e'` or `23282e`]               |
+  | `--format`                  | Badge output format [Default: Markdown] [possible values: markdown, url, rst, ascii-doc, html]    |
+
+</div>
+
 To initialize the private gist that will store the download counts use the `init` command  
 ```
 nexus_badges.exe init
@@ -78,5 +92,6 @@ commands.
 
 ### Normal usage
 After the initial set up is complete running Nexus Badges will update the remote gist with the _current_ download counts for each tracked mod. Then store the proper
-markdown of each badge in './io/badges.md'. Now you can copy your badges to your repository README.md or anywhere else that supports markdown. As long as you don't delete
-the private gist you will not have to modify the badge. Just run Nexus Badges whenever you want the count to be updated.  
+markdown of each badge in './io/badges.md' or '~/Documents' depending on platform and installation type. Now you can copy your badges to your repository README.md or
+anywhere else that supports the specified output format. As long as you don't delete the private gist you will not have to modify the badge. Just run Nexus Badges
+whenever you want the count to be updated.  
