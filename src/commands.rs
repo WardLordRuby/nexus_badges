@@ -158,6 +158,10 @@ impl BadgePreferences {
             modified = true;
             self.count = count_type;
         }
+        if let Some(format) = from.format {
+            modified = true;
+            self.format = format;
+        }
         if let Some(ref mut label) = from.label {
             modified = true;
             self.label = std::mem::take(label);

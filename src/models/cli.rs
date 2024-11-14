@@ -1,4 +1,4 @@
-use crate::models::badge_options::{BadgeStyle, Color, DownloadCount};
+use crate::models::badge_options::{BadgeFormat, BadgeStyle, Color, DownloadCount};
 use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -111,6 +111,10 @@ pub struct SetArgs {
     /// {n} [Tip: to remove a color set as default]
     #[arg(long)]
     pub color: Option<Color>,
+
+    /// Specify the output format of the generated badges [Default: Markdown]{n}  
+    #[arg(long)]
+    pub format: Option<BadgeFormat>,
 
     #[clap(skip)]
     pub modified: ModFlags,

@@ -12,7 +12,7 @@ pub mod services {
 
 use crate::{
     models::{
-        badge_options::BadgePreferences,
+        badge_options::{BadgePreferences, EncodedFields},
         cli::{Commands, Mod},
         error::Error,
         json_data::{GistResponse, Input, ModDetails, Version},
@@ -420,9 +420,6 @@ pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
     Ok(())
 }
 
-// MARK: TODO
-// add badge formatter for url, rSt, AsciiDoc, HTML
-
 fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
     let file = File::create(PATHS.badges.as_ref())?;
     let mut writer = BufWriter::new(file);
@@ -435,9 +432,9 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
         BadgePreferences::default()
     });
 
-    let encoded_url = percent_encode(universal_url.as_bytes(), URL_ENCODE_SET);
+    let encoded_json_url = percent_encode(universal_url.as_bytes(), URL_ENCODE_SET);
     let encoded_label = percent_encode(badge_prefs.label.as_bytes(), URL_ENCODE_SET);
-    let option_fields = badge_prefs.option_fields();
+    let option_fields = badge_prefs.option_fields(URL_ENCODE_SET);
 
     writeln!(writer, "# Shields.io Badges via Nexus Badges")?;
     writeln!(writer, "Base template: {BADGE_URL}")?;
@@ -448,12 +445,13 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
         let query = format!("$.{uid}.{}", badge_prefs.count.field_name());
         let encoded_query = percent_encode(query.as_bytes(), URL_ENCODE_SET);
         writeln!(writer, "## {}", entry.name)?;
-        writeln!(writer, "```markdown")?;
-        writeln!(writer,
-            "[![Nexus Downloads](https://img.shields.io/badge/dynamic/json?url={encoded_url}&query={encoded_query}&label={encoded_label}{option_fields})]({})",
-            entry.url
+        badge_prefs.format.write_badge(
+            &mut writer,
+            URL_ENCODE_SET,
+            &EncodedFields::new(&encoded_json_url, &encoded_query, &encoded_label),
+            &option_fields,
+            &entry.url,
         )?;
-        writeln!(writer, "```")?;
         writeln!(writer)?;
         writeln!(writer, "Configuration:")?;
         writeln!(writer, "- Query: {query}")?;
@@ -476,7 +474,7 @@ pub fn await_user_for_end(on_remote: bool) {
     }
 }
 
-pub const URL_ENCODE_SET: &AsciiSet = &CONTROLS
+const URL_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'!')
     .add(b'#')

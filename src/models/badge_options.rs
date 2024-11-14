@@ -1,6 +1,5 @@
-use crate::URL_ENCODE_SET;
 use clap::ValueEnum;
-use percent_encoding::percent_encode;
+use percent_encoding::{percent_encode, AsciiSet, PercentEncode};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     fmt::{Debug, Display},
@@ -11,6 +10,7 @@ use std::{
 #[serde(default)]
 pub struct BadgePreferences {
     style: BadgeStyle,
+    pub format: BadgeFormat,
     pub count: DownloadCount,
     pub label: String,
     #[serde(deserialize_with = "deserialize_color")]
@@ -22,7 +22,7 @@ pub struct BadgePreferences {
 }
 
 impl BadgePreferences {
-    pub fn option_fields(&self) -> String {
+    pub fn option_fields(&self, ascii_set: &'static AsciiSet) -> String {
         let mut output = String::new();
         if let Some(style) = self.style() {
             output.push_str(&format!("&style={style}"));
@@ -30,13 +30,13 @@ impl BadgePreferences {
         if let Some(ref color) = self.label_color.0 {
             output.push_str(&format!(
                 "&labelColor={}",
-                percent_encode(color.as_bytes(), URL_ENCODE_SET)
+                percent_encode(color.as_bytes(), ascii_set)
             ));
         }
         if let Some(ref color) = self.color.0 {
             output.push_str(&format!(
                 "&color={}",
-                percent_encode(color.as_bytes(), URL_ENCODE_SET)
+                percent_encode(color.as_bytes(), ascii_set)
             ));
         }
         output
@@ -60,6 +60,7 @@ impl Default for BadgePreferences {
         BadgePreferences {
             label: String::from("Nexus Downloads"),
             style: BadgeStyle::default(),
+            format: BadgeFormat::default(),
             count: DownloadCount::default(),
             label_color: Color::default(),
             color: Color::default(),
@@ -73,6 +74,7 @@ impl Display for BadgePreferences {
         writeln!(f, "- Label: {}", self.label)?;
         writeln!(f, "- Count: {}", self.count)?;
         writeln!(f, "- Style: {}", self.style)?;
+        writeln!(f, "- Format: {}", self.format)?;
         writeln!(f, "- Label color: {}", self.label_color)?;
         writeln!(f, "- Color: {}", self.color)?;
         Ok(())
@@ -162,6 +164,118 @@ impl DownloadCount {
             DownloadCount::Total => "mod_downloads",
             DownloadCount::Unique => "mod_unique_downloads",
         }
+    }
+}
+
+#[derive(Deserialize, Serialize, Default, Clone, Copy, Debug, ValueEnum)]
+pub enum BadgeFormat {
+    #[default]
+    #[value(alias = "Markdown")]
+    Markdown,
+    #[value(alias = "Url")]
+    Url,
+    #[value(alias = "rSt")]
+    Rst,
+    #[value(aliases = ["AsciiDoc", "asciiDoc", "asciidoc", "Ascii-doc", "ascii_doc"])]
+    AsciiDoc,
+    #[value(aliases = ["HTML", "Html"])]
+    Html,
+}
+
+impl Display for BadgeFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                BadgeFormat::Markdown => "markdown",
+                BadgeFormat::AsciiDoc => "asciiDoc",
+                BadgeFormat::Html => "html",
+                BadgeFormat::Rst => "rst",
+                BadgeFormat::Url => "url",
+            }
+        )
+    }
+}
+
+fn dynamic_json_url(encoded_data: &EncodedFields, option_fields: &str) -> String {
+    format!(
+        "https://img.shields.io/badge/dynamic/json?url={}&query={}&label={}{option_fields}",
+        encoded_data.json_url, encoded_data.query, encoded_data.label,
+    )
+}
+
+fn dynamic_badge_url_with_link(
+    ascii_set: &'static AsciiSet,
+    encoded_data: &EncodedFields,
+    option_fields: &str,
+    url: &str,
+) -> String {
+    format!(
+        "{}&link={}",
+        dynamic_json_url(encoded_data, option_fields),
+        percent_encode(url.as_bytes(), ascii_set)
+    )
+}
+
+pub struct EncodedFields<'a> {
+    json_url: &'a PercentEncode<'a>,
+    query: &'a PercentEncode<'a>,
+    label: &'a PercentEncode<'a>,
+}
+
+impl<'a> EncodedFields<'a> {
+    pub fn new(
+        json_url: &'a PercentEncode<'a>,
+        query: &'a PercentEncode<'a>,
+        label: &'a PercentEncode<'a>,
+    ) -> Self {
+        EncodedFields {
+            json_url,
+            query,
+            label,
+        }
+    }
+}
+
+impl BadgeFormat {
+    pub fn write_badge(
+        &self,
+        f: &mut impl std::io::Write,
+        ascii_set: &'static AsciiSet,
+        encoded_data: &EncodedFields,
+        option_fields: &str,
+        url: &str,
+    ) -> std::io::Result<()> {
+        writeln!(f, "```{self}")?;
+        match self {
+            BadgeFormat::Markdown => writeln!(
+                f,
+                "[![Nexus Downloads]({})]({url})",
+                dynamic_json_url(encoded_data, option_fields)
+            )?,
+            BadgeFormat::AsciiDoc => writeln!(
+                f,
+                "image:{}[Nexus Downloads]",
+                dynamic_badge_url_with_link(ascii_set, encoded_data, option_fields, url)
+            )?,
+            BadgeFormat::Html => writeln!(
+                f,
+                "<img alt=\"Nexus Downloads\" src=\"{}\">",
+                dynamic_badge_url_with_link(ascii_set, encoded_data, option_fields, url)
+            )?,
+            BadgeFormat::Rst => writeln!(
+                f,
+                ".. image:: {}\n  :alt: Nexus Downloads",
+                dynamic_badge_url_with_link(ascii_set, encoded_data, option_fields, url)
+            )?,
+            BadgeFormat::Url => writeln!(
+                f,
+                "{}",
+                dynamic_badge_url_with_link(ascii_set, encoded_data, option_fields, url)
+            )?,
+        }
+        writeln!(f, "```")
     }
 }
 
