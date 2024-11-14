@@ -2,13 +2,13 @@
 set -e
 
 # Check if package directory exists
-if [ -z "$(ls -A /build/temp/dist/linux)" ]; then
-    echo "Error: No package found in /build/temp/dist/linux"
+if [ -z "$(ls -A /build/tmp/dist/linux)" ]; then
+    echo "Error: No package found in /build/tmp/dist/linux"
     exit 1
 fi
 
 # Find the package directory
-PACKAGE_DIR=$(ls -d /build/temp/dist/linux/*/ | head -n 1)
+PACKAGE_DIR=$(ls -d /build/tmp/dist/linux/*/ | head -n 1)
 
 # Set permissions
 chmod 755 "$PACKAGE_DIR/DEBIAN"
