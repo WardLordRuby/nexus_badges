@@ -69,7 +69,7 @@ chmod +x "$PAYLOAD_DIR/$APP_NAME"
 
 # Copy and resize icon to Resources
 mkdir -p "$DIST_DIR/Resources"
-cp "assets/Icon.png" "$DIST_DIR/Resources/"
+cp "assets/Icon_512.png" "$DIST_DIR/Resources/Icon.png"
 sips -z 220 220 --padToHeightWidth 275 250 "$DIST_DIR/Resources/Icon.png"
 
 # Create uninstall script

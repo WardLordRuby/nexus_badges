@@ -5,7 +5,7 @@
 [Latest-dl]: https://github.com/WardLordRuby/nexus_badges/releases/latest
 [automation]: .github/workflows/automation.yml
 <div align="center">
-    <img src="https://raw.githubusercontent.com/WardLordRuby/nexus_badges/refs/heads/main/assets/Icon.png" width="15%" height="15%">
+    <img src="https://raw.githubusercontent.com/WardLordRuby/nexus_badges/refs/heads/main/assets/Icon_512.png" width="15%" height="15%">
 </div>
 
 # Nexus Badges
