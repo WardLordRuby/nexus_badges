@@ -1,0 +1,46 @@
+name: Build on osx
+on:
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    runs-on: macos-latest
+    strategy:
+        matrix:
+          target: [aarch64-apple-darwin, x86_64-apple-darwin]
+
+    steps:
+      - name: Checkout latest main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install rust
+        run: |
+          rustup target add ${{ matrix.target }}
+
+      - name: Run build script
+        run: |
+          chmod +x ./build/build-macOS.sh
+          ./build/build-macOS.sh -v $(git describe --tags --abbrev=0 | sed 's/^v//') -t ${{ matrix.target }}
+
+      - name: Set architecture var
+        id: architecture
+        run: |
+          if [[ "${{ matrix.target }}" == "x86_64-apple-darwin" ]]; then
+            ARCHITECTURE=amd64
+          elif [[ "${{ matrix.target }}" == "aarch64-apple-darwin" ]]; then
+            ARCHITECTURE=arm64
+          else
+            echo "Unexpected target: ${{ matrix.target }}"
+            exit 1
+          fi
+          echo "short=${ARCHITECTURE}" >> $GITHUB_OUTPUT
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/nexus_badges_macOS_${{ steps.architecture.outputs.short }}.dmg
