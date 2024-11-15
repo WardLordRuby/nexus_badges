@@ -33,7 +33,11 @@ if [ -z "$VERSION" ]; then
 fi
 
 # Verify target
-if [[ "$TARGET" != "x86_64-apple-darwin" && "$TARGET" != "aarch64-apple-darwin" ]]; then
+if [[ "$TARGET" == "x86_64-apple-darwin" ]]; then
+    ARCHITECTURE="amd64"
+elif [[ "$TARGET" == "aarch64-apple-darwin" ]]; then
+    ARCHITECTURE="arm64"
+else
     echo "Error: Unsupported target"
     exit 1
 fi
@@ -42,7 +46,8 @@ fi
 APP_NAME=$(echo "$BINARY_NAME" | sed 's/_/-/g')
 APP_NAME_DISPLAY=$(echo "$BINARY_NAME" | sed 's/[_-]/ /g' | awk '{for(i=1;i<=NF;i++)sub(/./,toupper(substr($i,1,1)),$i)}1')
 APP_NAME_CC=$(echo "$APP_NAME_DISPLAY" | sed 's/ //g')
-PKG_NAME="${APP_NAME}-${VERSION}"
+PKG_NAME="$APP_NAME-$VERSION"
+DMG_NAME="${BINARY_NAME}_macOS_${ARCHITECTURE}"
 
 # Build release version
 echo "Building release version for $TARGET..."
@@ -62,7 +67,7 @@ UNINSTALL_SCRIPT="uninstall-$APP_NAME"
 cp "target/$TARGET/release/$BINARY_NAME" "$PAYLOAD_DIR/$APP_NAME"
 chmod +x "$PAYLOAD_DIR/$APP_NAME"
 
-# Copy icon and other resources to dist/Resources
+# Copy and resize icon to Resources
 mkdir -p "$DIST_DIR/Resources"
 cp "assets/Icon.png" "$DIST_DIR/Resources/"
 sips -z 220 220 --padToHeightWidth 275 250 "$DIST_DIR/Resources/Icon.png"
@@ -196,29 +201,29 @@ cat > "$DIST_DIR/distribution.xml" << EOF
     <choice id="default" visible="false" selected="true" title="$APP_NAME_DISPLAY">
         <pkg-ref id="com.$APP_NAME.pkg"/>
     </choice>
-    <pkg-ref id="com.$APP_NAME.pkg" version="$VERSION">$PKG_NAME.pkg</pkg-ref>
+    <pkg-ref id="com.$APP_NAME.pkg" version="$VERSION">$APP_NAME.pkg</pkg-ref>
     <conclusion file="conclusion.html" mime-type="text/html"/>
 </installer-gui-script>
 EOF
 
 # Create package pkg
 pkgbuild \
-  --identifier "com.$APP_NAME.payload" \
+  --identifier "com.$APP_NAME.pkg" \
   --root "$PAYLOAD_DIR" \
   --install-location "$INSTALL_DIR" \
-  "$DIST_DIR/$PKG_NAME.pkg"
+  "$DIST_DIR/$APP_NAME.pkg"
 
 productbuild \
   --distribution "$DIST_DIR/distribution.xml" \
   --resources "$DIST_DIR/Resources" \
   --package-path "$DIST_DIR" \
-  "$DIST_DIR/$APP_NAME.pkg"
+  "$DIST_DIR/$PKG_NAME.pkg"
 
 # Create DMG
 echo "Creating DMG..."
-hdiutil create -volname "$APP_NAME_DISPLAY" -srcfolder "$DIST_DIR/$APP_NAME.pkg" -ov -format UDZO "target/$TARGET/release/$PKG_NAME.dmg"
+hdiutil create -volname "$APP_NAME_DISPLAY" -srcfolder "$DIST_DIR/$PKG_NAME.pkg" -ov -format UDZO "target/$TARGET/release/$DMG_NAME.dmg"
 
 # Remove tmp directory
 rm -rf "build/tmp"
 
-echo "Done! Created target/$TARGET/release$PKG_NAME.dmg"
+echo "Done! Created target/$TARGET/release$DMG_NAME.dmg"

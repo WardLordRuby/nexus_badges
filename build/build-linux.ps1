@@ -104,7 +104,7 @@ try {
         Write-Host "Done! Package created in target/$Target/release/"
 
         Move-Item "build/tmp/dist/linux/$LinuxBinaryName-$Version.deb" `
-            "target/$Target/release/$LinuxBinaryName-$Version.deb" -Force
+            "target/$Target/release/${BinaryName}_linux_${Architecture}.deb" -Force
     }
 
 } finally {
