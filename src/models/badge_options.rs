@@ -198,42 +198,47 @@ impl Display for BadgeFormat {
     }
 }
 
-fn dynamic_json_url(encoded_data: &EncodedFields) -> String {
+fn dynamic_json_url(
+    ascii_set: &'static AsciiSet,
+    encoded_data: &EncodedFields,
+    query: &str,
+) -> String {
     format!(
         "https://img.shields.io/badge/dynamic/json?url={}&query={}&label={}{}",
-        encoded_data.json_url, encoded_data.query, encoded_data.label, encoded_data.option_fields
+        encoded_data.json_url,
+        percent_encode(query.as_bytes(), ascii_set),
+        encoded_data.label,
+        encoded_data.option_fields
     )
 }
 
 fn dynamic_badge_url_with_link(
     ascii_set: &'static AsciiSet,
     encoded_data: &EncodedFields,
+    query: &str,
     url: &str,
 ) -> String {
     format!(
         "{}&link={}",
-        dynamic_json_url(encoded_data),
+        dynamic_json_url(ascii_set, encoded_data, query),
         percent_encode(url.as_bytes(), ascii_set)
     )
 }
 
 pub struct EncodedFields<'a> {
-    json_url: &'a PercentEncode<'a>,
-    query: &'a PercentEncode<'a>,
-    label: &'a PercentEncode<'a>,
-    option_fields: &'a str,
+    json_url: PercentEncode<'a>,
+    label: PercentEncode<'a>,
+    option_fields: String,
 }
 
 impl<'a> EncodedFields<'a> {
     pub fn new(
-        json_url: &'a PercentEncode<'a>,
-        query: &'a PercentEncode<'a>,
-        label: &'a PercentEncode<'a>,
-        option_fields: &'a str,
+        json_url: PercentEncode<'a>,
+        label: PercentEncode<'a>,
+        option_fields: String,
     ) -> Self {
         EncodedFields {
             json_url,
-            query,
             label,
             option_fields,
         }
@@ -246,6 +251,7 @@ impl BadgeFormat {
         f: &mut impl std::io::Write,
         ascii_set: &'static AsciiSet,
         encoded_data: &EncodedFields,
+        query: &str,
         url: &str,
     ) -> std::io::Result<()> {
         const IMAGE_ALT_TEXT: &str = "Nexus Downloads";
@@ -255,27 +261,27 @@ impl BadgeFormat {
             BadgeFormat::Markdown => writeln!(
                 f,
                 "[![{IMAGE_ALT_TEXT}]({})]({url})",
-                dynamic_json_url(encoded_data)
+                dynamic_json_url(ascii_set, encoded_data, query)
             )?,
             BadgeFormat::AsciiDoc => writeln!(
                 f,
                 "image:{}[{IMAGE_ALT_TEXT}]",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, url)
+                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
             )?,
             BadgeFormat::Html => writeln!(
                 f,
                 "<img alt=\"{IMAGE_ALT_TEXT}\" src=\"{}\">",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, url)
+                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
             )?,
             BadgeFormat::Rst => writeln!(
                 f,
                 ".. image:: {}\n  :alt: {IMAGE_ALT_TEXT}",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, url)
+                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
             )?,
             BadgeFormat::Url => writeln!(
                 f,
                 "{}",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, url)
+                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
             )?,
         }
         writeln!(f, "```")
