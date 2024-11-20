@@ -131,7 +131,7 @@ fn init_paths() -> FilePaths {
     #[cfg(target_os = "macos")]
     let base = format!(
         "{home}/Library/{}",
-        capital_camel_case(env!("CARGO_PKG_NAME"))
+        camel_case(env!("CARGO_PKG_NAME"), true)
     );
 
     FilePaths {
@@ -159,24 +159,29 @@ impl FilePaths {
 }
 
 #[cfg(target_os = "macos")]
-fn capital_camel_case(input: &str) -> String {
-    let mut capilize_next = false;
-    let separators = ['-', '_'];
+fn camel_case(input: &str, capitalize_first: bool) -> String {
+    const SEPARATORS: [char; 2] = ['-', '_'];
+
+    let mut capitalize_next = false;
     let input = input.to_lowercase();
     input
         .trim()
-        .trim_matches(separators)
+        .trim_matches(SEPARATORS)
         .char_indices()
         .filter_map(|(i, ch)| {
             if i == 0 {
-                return Some(ch.to_ascii_uppercase());
+                return Some(if capitalize_first {
+                    ch.to_ascii_uppercase()
+                } else {
+                    ch
+                });
             }
-            if ch.is_whitespace() || separators.iter().any(|&s| s == ch) {
-                capilize_next = true;
+            if ch.is_whitespace() || SEPARATORS.iter().any(|&s| s == ch) {
+                capitalize_next = true;
                 return None;
             }
-            if capilize_next {
-                capilize_next = false;
+            if capitalize_next {
+                capitalize_next = false;
                 return Some(ch.to_ascii_uppercase());
             }
             Some(ch)
