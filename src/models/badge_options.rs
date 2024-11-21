@@ -22,7 +22,7 @@ pub struct BadgePreferences {
 }
 
 impl BadgePreferences {
-    pub fn option_fields(&self, ascii_set: &'static AsciiSet) -> String {
+    fn encode_optionals(&self, ascii_set: &'static AsciiSet) -> String {
         let mut output = String::new();
         if let Some(style) = self.style() {
             output.push_str(&format!("&style={style}"));
@@ -233,14 +233,14 @@ pub struct EncodedFields<'a> {
 
 impl<'a> EncodedFields<'a> {
     pub fn new(
-        json_url: PercentEncode<'a>,
-        label: PercentEncode<'a>,
-        option_fields: String,
+        json_url: &'a str,
+        badge_prefs: &'a BadgePreferences,
+        ascii_set: &'static AsciiSet,
     ) -> Self {
         EncodedFields {
-            json_url,
-            label,
-            option_fields,
+            json_url: percent_encode(json_url.as_bytes(), ascii_set),
+            label: percent_encode(badge_prefs.label.as_bytes(), ascii_set),
+            option_fields: badge_prefs.encode_optionals(ascii_set),
         }
     }
 }

@@ -20,7 +20,7 @@ use crate::{
     services::git::{get_remote, gist_id_endpoint},
 };
 use constcat::concat;
-use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
@@ -437,11 +437,7 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
         BadgePreferences::default()
     });
 
-    let encoded_fields = EncodedFields::new(
-        percent_encode(universal_url.as_bytes(), URL_ENCODE_SET),
-        percent_encode(badge_prefs.label.as_bytes(), URL_ENCODE_SET),
-        badge_prefs.option_fields(URL_ENCODE_SET),
-    );
+    let encoded_fields = EncodedFields::new(universal_url, &badge_prefs, URL_ENCODE_SET);
 
     writeln!(writer, "# Shields.io Badges via Nexus Badges")?;
     writeln!(writer, "Base template: {BADGE_URL}")?;
