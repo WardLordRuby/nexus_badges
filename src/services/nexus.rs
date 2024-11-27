@@ -1,6 +1,6 @@
 use crate::{
     models::{cli::Mod, error::Error, json_data::ModDetails},
-    verify_added, verify_nexus, write, OK_RESPONSE, PATHS, VARS,
+    verify_added, verify_nexus, write, OK_RESPONSE, PATHS, TOTAL_KEY, VARS,
 };
 use std::{
     collections::BTreeMap,
@@ -28,12 +28,13 @@ impl Mod {
 pub async fn update_download_counts(
     mods: Vec<Mod>,
     on_remote: bool,
-) -> Result<BTreeMap<u64, ModDetails>, Error> {
+) -> Result<BTreeMap<String, ModDetails>, Error> {
     verify_nexus()?;
     verify_added(&mods)?;
 
     let client = reqwest::Client::new();
     let mut tasks = JoinSet::new();
+    let mut total = ModDetails::total();
 
     for descriptor in mods.into_iter() {
         tasks.spawn(try_get_info(descriptor, client.clone()));
@@ -44,7 +45,8 @@ pub async fn update_download_counts(
     while let Some(res) = tasks.join_next().await {
         match res {
             Ok(Ok(data)) => {
-                if let Some(dup) = output.insert(data.uid, data) {
+                total.add(&data);
+                if let Some(dup) = output.insert(data.uid.to_string(), data) {
                     tasks.abort_all();
                     while tasks.join_next().await.is_some() {}
                     return Err(Error::Io(io::Error::new(
@@ -62,11 +64,16 @@ pub async fn update_download_counts(
         }
     }
 
+    output.insert(TOTAL_KEY.to_string(), total);
+
     println!("Retrieved download counts from Nexus Mods");
 
     if !on_remote {
         write(output.clone(), &PATHS.output)?;
-        println!("Download counts saved locally for {} mod(s)", output.len());
+        println!(
+            "Download counts saved locally for {} mod(s)",
+            output.len() - 1
+        );
     }
 
     Ok(output)

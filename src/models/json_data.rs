@@ -13,10 +13,11 @@ pub struct Input {
     pub mods: Vec<Mod>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ModDetails {
     pub name: String,
     #[serde(skip_deserializing)]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub url: String,
     #[serde(skip_serializing)]
     pub uid: u64,

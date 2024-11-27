@@ -198,7 +198,7 @@ impl Display for BadgeFormat {
     }
 }
 
-fn dynamic_json_url(
+fn dynamic_badge_url(
     ascii_set: &'static AsciiSet,
     encoded_data: &EncodedFields,
     query: &str,
@@ -220,7 +220,7 @@ fn dynamic_badge_url_with_link(
 ) -> String {
     format!(
         "{}&link={}",
-        dynamic_json_url(ascii_set, encoded_data, query),
+        dynamic_badge_url(ascii_set, encoded_data, query),
         percent_encode(url.as_bytes(), ascii_set)
     )
 }
@@ -256,33 +256,25 @@ impl BadgeFormat {
     ) -> std::io::Result<()> {
         const IMAGE_ALT_TEXT: &str = "Nexus Downloads";
 
+        let badge_url = if matches!(self, BadgeFormat::Markdown) || url.is_empty() {
+            dynamic_badge_url(ascii_set, encoded_data, query)
+        } else {
+            dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
+        };
+
         writeln!(f, "```{self}")?;
         match self {
-            BadgeFormat::Markdown => writeln!(
-                f,
-                "[![{IMAGE_ALT_TEXT}]({})]({url})",
-                dynamic_json_url(ascii_set, encoded_data, query)
-            )?,
-            BadgeFormat::AsciiDoc => writeln!(
-                f,
-                "image:{}[{IMAGE_ALT_TEXT}]",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
-            )?,
-            BadgeFormat::Html => writeln!(
-                f,
-                "<img alt=\"{IMAGE_ALT_TEXT}\" src=\"{}\">",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
-            )?,
-            BadgeFormat::Rst => writeln!(
-                f,
-                ".. image:: {}\n  :alt: {IMAGE_ALT_TEXT}",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
-            )?,
-            BadgeFormat::Url => writeln!(
-                f,
-                "{}",
-                dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
-            )?,
+            BadgeFormat::Markdown => {
+                if url.is_empty() {
+                    writeln!(f, "![{IMAGE_ALT_TEXT}]({badge_url})")?
+                } else {
+                    writeln!(f, "[![{IMAGE_ALT_TEXT}]({badge_url})]({url})")?
+                }
+            }
+            BadgeFormat::AsciiDoc => writeln!(f, "image:{badge_url}[{IMAGE_ALT_TEXT}]")?,
+            BadgeFormat::Html => writeln!(f, "<img alt=\"{IMAGE_ALT_TEXT}\" src=\"{badge_url}\">")?,
+            BadgeFormat::Rst => writeln!(f, ".. image:: {badge_url}\n  :alt: {IMAGE_ALT_TEXT}")?,
+            BadgeFormat::Url => writeln!(f, "{badge_url}")?,
         }
         writeln!(f, "```")
     }

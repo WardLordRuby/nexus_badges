@@ -53,6 +53,8 @@ pub const UPDATED_RESPONSE: u16 = 204;
 const VERSION_URL: &str =
     "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw";
 
+pub const TOTAL_KEY: &str = "Totals";
+
 static VARS: OnceLock<StartupVars> = OnceLock::new();
 
 #[macro_export]
@@ -209,6 +211,18 @@ impl Display for Commands {
 }
 
 impl ModDetails {
+    fn total() -> Self {
+        ModDetails {
+            name: String::from("Sum of all tracked counts"),
+            ..Default::default()
+        }
+    }
+
+    fn add(&mut self, other: &Self) {
+        self.mod_downloads += other.mod_downloads;
+        self.mod_unique_downloads += other.mod_unique_downloads;
+    }
+
     fn add_url(mut self, from: &Mod) -> Self {
         self.url = from.url();
         self
@@ -425,7 +439,7 @@ pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Result<(), Error> {
+fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Result<(), Error> {
     let file = File::create(PATHS.badges.as_ref())?;
     let mut writer = BufWriter::new(file);
 
@@ -457,7 +471,9 @@ fn write_badges(output: BTreeMap<u64, ModDetails>, universal_url: &str) -> Resul
         writeln!(writer)?;
         writeln!(writer, "Configuration:")?;
         writeln!(writer, "- Query: {query}")?;
-        writeln!(writer, "- Link: {}", entry.url)?;
+        if !entry.url.is_empty() {
+            writeln!(writer, "- Link: {}", entry.url)?;
+        }
         writeln!(writer)?;
     }
 
