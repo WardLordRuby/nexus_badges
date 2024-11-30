@@ -36,7 +36,13 @@ Section: utils
 Priority: optional
 Architecture: $Architecture
 Maintainer: WardLordRuby
+Depends: libc6 (>= 2.28), libgcc1
 Description: Shields.io badge generator for Nexus Mods
+ The Nexus Mod Badges package includes various badge formats for showing mod
+ statistics such as total downloads, unique downloads, and more. This package
+ includes badges for different output formats including Markdown, HTML, and
+ others. It is designed to be easily integrated with websites, README files,
+ or any other platform supporting badges.
 "@
 
 $PostRM = @"
@@ -66,10 +72,12 @@ try {
 
     # Create distribution directory
     $DistDir = "build/tmp/dist/linux/$LinuxBinaryName-$Version"
+    $ChangelogDir = "$DistDir/usr/share/doc/$LinuxBinaryName"
     New-Item -ItemType Directory -Force -Path $DistDir
     New-Item -ItemType Directory -Force -Path "$DistDir/usr/local/bin"
     New-Item -ItemType Directory -Force -Path "$DistDir/usr/share/applications"
     New-Item -ItemType Directory -Force -Path "$DistDir/usr/share/icons/hicolor/256x256/apps"
+    New-Item -ItemType Directory -Force -Path "$ChangelogDir"
 
     # Copy binary
     Copy-Item "target/$Target/release/$BinaryName" `
@@ -90,7 +98,7 @@ try {
     $PostRM | Out-File -FilePath "$DistDir/DEBIAN/postrm" -Encoding UTF8
 
     # Copy changelog
-    Copy-Item "build/changelog" "$DistDir/DEBIAN/changelog"
+    Copy-Item "build/changelog" "$ChangelogDir/changelog"
 
     # Build the Docker image if it doesn't exist
     $ImageName = "deb-builder"

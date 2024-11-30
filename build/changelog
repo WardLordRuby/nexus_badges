@@ -1,3 +1,10 @@
+nexus-badges (0.3.2) UNRELEASED; urgency=low
+
+  * Added additional badge that totals downloads of all tracked mods
+  * Fixed lintian debian package lints
+
+ -- WardLordRuby <@7thWardLord Discord>  Sat, 30 Nov 2024 11:51:00 +0000
+
 nexus-badges (0.3.1) stable; urgency=medium
 
   * Overhaul to 'badges.md' output format.
