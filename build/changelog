@@ -2,6 +2,7 @@ nexus-badges (0.3.2) UNRELEASED; urgency=low
 
   * Added additional badge that totals downloads of all tracked mods
   * Fixed lintian debian package lints
+  * macOS uninstall script now removes config files for all users
 
  -- WardLordRuby <@7thWardLord Discord>  Sat, 30 Nov 2024 11:51:00 +0000
 

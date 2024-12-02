@@ -85,9 +85,7 @@ NC='\033[0m' # No Color
 # Define paths
 EXECUTABLE_PATH="$INSTALL_DIR/$APP_NAME"
 UNINSTALLER_PATH="$INSTALL_DIR/$UNINSTALL_SCRIPT"
-CONFIG_DIR="\$HOME/Library/$APP_NAME_CC"
 
-# Function to print with color
 print_status() {
     echo -e "\${GREEN}\$1\${NC}"
 }
@@ -119,25 +117,34 @@ else
 fi
 
 # Ask about config files
-if [ -d "\$CONFIG_DIR" ]; then
-    echo
-    read -p "Do you want to remove configuration files as well? (y/N) " -n 1 -r
-    echo
-    if [[ \$REPLY =~ ^[Yy]$ ]]; then
-        print_status "Removing configuration directory..."
-        rm -rf "\$CONFIG_DIR"
-        if [ \$? -eq 0 ]; then
-            print_status "✓ Configuration directory removed successfully"
-        else
-            print_error "Failed to remove configuration directory"
-            exit 1
+echo
+read -p "Do you want to remove configuration files as well? (y/N) " -n 1 -r
+echo
+if [[ \$REPLY =~ ^[Yy]$ ]]; then
+    print_status "Removing configuration directory..."
+
+    for home_dir in /Users/*; do
+        # Skip if not a directory
+        [ -d "\$home_dir" ] || continue
+        
+        config_dir="\$home_dir/Library/$APP_NAME_CC"
+        if [ -d "\$config_dir" ]; then
+            # Remove Config Directory if it exists
+            rm -rf "\$config_dir"
+
+            if [ \$? -eq 0 ]; then
+                print_status "✓ Configuration directory: '\$config_dir' removed"
+            else
+                print_error "Failed to remove '\$config_dir'"
+                exit 1 
+            fi
         fi
-    else
-        print_status "Configuration directory preserved at \$CONFIG_DIR"
-    fi
+    done
+else
+    print_status "Configuration files preserved"
 fi
 
-# Remove executable
+# Remove uninstaller
 print_status "Removing uninstaller..."
 sudo rm "\$UNINSTALLER_PATH"
 if [ \$? -eq 0 ]; then
