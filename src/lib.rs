@@ -319,7 +319,8 @@ pub struct StartupVars {
 }
 
 impl StartupVars {
-    /// NOTE: this method is not supported on local
+    /// NOTE: this method is not supported on local  
+    /// `nexus_key` and `gist_id` fields are not populated from enviorment variables
     pub fn git_api_only() -> Result<Self, Error> {
         const ENV_NAME_REPO: &str = "REPO_FULL";
 
@@ -375,14 +376,14 @@ impl Input {
         }
     }
 
+    /// `owner` and `repo` fields are not populated from enviorment variables
     fn from_env() -> Result<Self, Error> {
         Ok(Input {
             git_token: std::env::var(ENV_NAME_GIT)?,
             nexus_key: std::env::var(ENV_NAME_NEXUS)?,
             gist_id: std::env::var(ENV_NAME_GIST_ID)?,
-            owner: String::new(),
-            repo: String::new(),
             mods: serde_json::from_str(&std::env::var(ENV_NAME_MODS)?)?,
+            ..Default::default()
         })
     }
 }
@@ -444,9 +445,8 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
     let mut writer = BufWriter::new(file);
 
     let badge_prefs = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_else(|err| {
-        match err {
-            Error::Io(err) if err.kind() == ErrorKind::NotFound => (),
-            _ => eprintln!("{err}, using default styling"),
+        if !matches!(&err, Error::Io(err) if err.kind() == ErrorKind::NotFound) {
+            eprintln!("{err}, using default styling")
         }
         BadgePreferences::default()
     });
