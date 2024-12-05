@@ -68,13 +68,14 @@ async fn main() {
             Commands::UpdateCacheKey { old: _, new: _ } => unreachable!("by repo-variable guard"),
             Commands::Version => unreachable!("by version guard"),
         }
-    } else {
-        process(input_mods, cli.remote).await.unwrap_or_else(|err| {
-            eprintln!("{err}");
-            if cli.remote {
-                std::process::exit(1);
-            }
-        });
-        await_user_for_end(cli.remote);
+        return;
     }
+
+    process(input_mods, cli.remote).await.unwrap_or_else(|err| {
+        eprintln!("{err}");
+        if cli.remote {
+            std::process::exit(1);
+        }
+    });
+    await_user_for_end(cli.remote);
 }
