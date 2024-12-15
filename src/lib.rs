@@ -74,14 +74,18 @@ macro_rules! unsupported {
     };
 }
 
+pub fn exit_on_remote(on_remote: bool, code: i32) {
+    if on_remote {
+        std::process::exit(code)
+    }
+}
+
 #[macro_export]
 macro_rules! return_after {
     ($result:expr, $on_remote:expr) => {
         $result.unwrap_or_else(|err| {
             eprintln!("{err}");
-            if $on_remote {
-                std::process::exit(1)
-            }
+            nexus_badges::exit_on_remote($on_remote, 1)
         });
         return;
     };

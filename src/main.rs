@@ -5,6 +5,7 @@ use nexus_badges::{
         init_actions, init_remote, process, update_args_local, update_args_remote,
         update_cache_key, version, Modify,
     },
+    exit_on_remote,
     models::{
         cli::{Cli, Commands},
         error::Error,
@@ -30,12 +31,11 @@ async fn main() {
             Commands::SetArg(args) => {
                 unsupported!(command, on_remote, cli.remote);
                 if let Err(err) = update_args_local(args).await {
-                    match err {
-                        Error::NotSetup(_) => (),
-                        _ => eprintln!("{err}"),
+                    if !matches!(err, Error::NotSetup(_)) {
+                        eprintln!("{err}")
                     }
                     return;
-                };
+                }
                 if !args.modified.any() {
                     return;
                 }
@@ -48,9 +48,7 @@ async fn main() {
         Ok(data) => data,
         Err(err) => {
             eprintln!("{err}");
-            if cli.remote {
-                std::process::exit(1);
-            }
+            exit_on_remote(cli.remote, 1);
             await_user_for_end(cli.remote);
             return;
         }
@@ -73,9 +71,7 @@ async fn main() {
 
     process(input_mods, cli.remote).await.unwrap_or_else(|err| {
         eprintln!("{err}");
-        if cli.remote {
-            std::process::exit(1);
-        }
+        exit_on_remote(cli.remote, 1);
     });
     await_user_for_end(cli.remote);
 }
