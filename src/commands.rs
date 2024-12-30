@@ -60,9 +60,9 @@ trait Update {
 
 impl Update for Vec<Mod> {
     async fn write_and_try_set_remote(self) -> Result<(), Error> {
-        let new_mod_json = (verify_repo().is_ok()).then(|| {
-            serde_json::to_string(&self.clone()).expect("`Vec<Mod>` is always ok to stringify")
-        });
+        let new_mod_json = verify_repo()
+            .is_ok()
+            .then(|| serde_json::to_string(&self).expect("`Vec<Mod>` is always ok to stringify"));
         let updated = Input::from(VARS.get().expect("set on startup"), self);
         write(updated, &PATHS.input)?;
 
