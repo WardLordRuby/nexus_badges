@@ -292,20 +292,15 @@ pub async fn set_repository_secret(
         .send()
         .await?;
 
-    if server_response.status() == CREATED_RESPONSE || server_response.status() == UPDATED_RESPONSE
-    {
-        println!(
-            "Repository secret: {secret_name}, {}",
-            match server_response.status() {
-                s if s == CREATED_RESPONSE => "created",
-                s if s == UPDATED_RESPONSE => "updated",
-                _ => unreachable!("by outer if"),
-            }
-        );
-        return Ok(());
+    let print_status = |status: &str| println!("Repository secret: {secret_name}, {status}");
+
+    match server_response.status() {
+        s if s == CREATED_RESPONSE => print_status("created"),
+        s if s == UPDATED_RESPONSE => print_status("updated"),
+        _ => return Err(Error::BadResponse(server_response.text().await?)),
     }
 
-    Err(Error::BadResponse(server_response.text().await?))
+    Ok(())
 }
 
 fn encrypt_secret(secret: &str, public_key: &str) -> Result<String, Error> {

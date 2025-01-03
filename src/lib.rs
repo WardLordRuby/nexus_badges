@@ -74,6 +74,7 @@ macro_rules! unsupported {
     };
 }
 
+#[inline]
 pub fn exit_on_remote(on_remote: bool, code: i32) {
     if on_remote {
         std::process::exit(code)
