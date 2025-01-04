@@ -30,6 +30,7 @@ jobs:
       - name: Check for update
         id: check_ver
         if: steps.cache.outputs.cache-hit
+        continue-on-error: true
         run: |
           set +e
           ./nexus-mods --remote version
