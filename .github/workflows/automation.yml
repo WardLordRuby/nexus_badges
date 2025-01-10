@@ -34,11 +34,10 @@ jobs:
         run: |
           set +e
           ./nexus-mods --remote version
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: Download latest binary
         id: download_latest
-        if: ${{ !steps.cache.outputs.cache-hit || steps.check_ver.outputs.exit_code == '70' }}
+        if: ${{ !steps.cache.outputs.cache-hit || steps.check_ver.outputs.outcome == 'failure' }}
         continue-on-error: true
         run: |
           wget "https://github.com/WardLordRuby/nexus_badges/releases/latest/download/nexus_badges_linux_amd64.gz" -O ./nexus-mods.gz
