@@ -62,11 +62,11 @@ pub enum Commands {
 #[derive(Args, Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct Mod {
     /// The name of the game the mod is made for
-    #[arg(short, long)]
+    #[arg(short, long, alias = "game")]
     pub domain: String,
 
     /// The ID of the mod
-    #[arg(short, long)]
+    #[arg(short, long, alias = "id")]
     pub mod_id: usize,
 }
 

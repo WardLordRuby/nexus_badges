@@ -25,6 +25,11 @@ impl Mod {
     }
 }
 
+async fn abort_and_wait<T: 'static>(tasks: &mut JoinSet<T>) {
+    tasks.abort_all();
+    while tasks.join_next().await.is_some() {}
+}
+
 pub async fn update_download_counts(
     mods: Vec<Mod>,
     on_remote: bool,
@@ -47,8 +52,7 @@ pub async fn update_download_counts(
             Ok(Ok(data)) => {
                 total.add(&data);
                 if let Some(dup) = output.insert(data.uid.to_string(), data) {
-                    tasks.abort_all();
-                    while tasks.join_next().await.is_some() {}
+                    abort_and_wait(&mut tasks).await;
                     return Err(Error::Io(io::Error::new(
                         ErrorKind::InvalidInput,
                         format!("duplicate tracked mod: {}, in: {}", dup.name, PATHS.input),
@@ -56,11 +60,13 @@ pub async fn update_download_counts(
                 }
             }
             Ok(Err(err)) => {
-                tasks.abort_all();
-                while tasks.join_next().await.is_some() {}
+                abort_and_wait(&mut tasks).await;
                 return Err(err);
             }
-            Err(_) => unreachable!("task can't panic"),
+            Err(err) => {
+                abort_and_wait(&mut tasks).await;
+                return Err(err.into());
+            }
         }
     }
 

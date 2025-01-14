@@ -14,6 +14,7 @@ pub enum Error {
     Decode(base64::DecodeError),
     Encrypt(crypto_box::aead::Error),
     Env(std::env::VarError),
+    Join(tokio::task::JoinError),
 }
 
 impl From<reqwest::Error> for Error {
@@ -52,6 +53,12 @@ impl From<std::env::VarError> for Error {
     }
 }
 
+impl From<tokio::task::JoinError> for Error {
+    fn from(value: tokio::task::JoinError) -> Self {
+        Error::Join(value)
+    }
+}
+
 impl Error {
     fn msg(&self) -> Cow<'_, str> {
         match self {
@@ -64,6 +71,7 @@ impl Error {
             Error::Decode(err) => Cow::Owned(err.to_string()),
             Error::Encrypt(err) => Cow::Owned(err.to_string()),
             Error::Env(err) => Cow::Owned(err.to_string()),
+            Error::Join(err) => Cow::Owned(err.to_string()),
         }
     }
 }
@@ -86,6 +94,7 @@ impl Debug for Error {
             Error::Decode(err) => write!(f, "{err:?}"),
             Error::Encrypt(err) => write!(f, "{err:?}"),
             Error::Env(err) => write!(f, "{err:?}"),
+            Error::Join(err) => write!(f, "{err:?}"),
         }
     }
 }
