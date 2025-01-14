@@ -14,29 +14,36 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Add Mod to input data
+    /// Add/Register a Nexus mod to track the download count of
+    #[command(alias = "Add")]
     Add(Mod),
 
-    /// Remove mod from input data
+    /// Remove and stop tracking the download count of a registered mod
+    #[command(alias = "Remove")]
     Remove(Mod),
 
     /// Configure necessary credentials for NexusMod and Git API calls
-    #[command(alias = "set")]
+    /// {n}  and set badge style preferences
+    #[command(aliases = ["Set", "set"])]
     SetArg(SetArgs),
 
     /// Initalize private gist to be used as a json endpoint for badge download counters
+    #[command(alias = "Init")]
     Init,
 
     /// Initalize GitHub actions to update the remote gist once daily
+    #[command(aliases = ["InitActions", "init_actions", "Init-Actions", "initActions"])]
     InitActions,
 
     /// Enable/Disable the GitHub action automation workflow
+    #[command(alias = "Automation")]
     Automation {
         #[arg(value_enum)]
         state: Workflow,
     },
 
     /// Display current version and check for updates
+    #[command(alias = "Version")]
     Version,
 
     /// Remove previous cache and update the cache repository variable [Not supported on local]
@@ -76,7 +83,8 @@ pub struct SetArgs {
     #[arg(long, alias = "nexus-key")]
     pub nexus: Option<String>,
 
-    /// Identifier of the target Remote Gist
+    /// Identifier of the target remote Gist
+    /// {n}  [This value is automatically set by the `init` command]
     #[arg(long, alias = "gist-id")]
     pub gist: Option<String>,
 
@@ -84,7 +92,7 @@ pub struct SetArgs {
     #[arg(long)]
     pub owner: Option<String>,
 
-    /// Name of your forked repository of 'nexus_badges' without the .git extension
+    /// Name of repository containing 'automation.yml' without the .git extension
     /// {n}  [Required for GitHub actions setup]
     #[arg(long)]
     pub repo: Option<String>,
@@ -136,6 +144,8 @@ impl ModFlags {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum Workflow {
+    #[value(alias = "Enable")]
     Enable,
+    #[value(alias = "Disable")]
     Disable,
 }
