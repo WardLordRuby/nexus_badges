@@ -5,7 +5,7 @@ nexus-badges (0.3.2) stable; urgency=low
   * macOS uninstall script now removes config files for all users
   * Updated cli aliases and documentation
 
- -- WardLordRuby <@7thWardLord Discord>  Sat, 30 Nov 2024 11:51:00 +0000
+ -- WardLordRuby <@7thWardLord Discord>  Tue, 14 Jan 2025 02:30:00 +0000
 
 nexus-badges (0.3.1) stable; urgency=medium
 
