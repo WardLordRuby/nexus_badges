@@ -1,13 +1,14 @@
 use crate::{
+    CREATED_RESPONSE, OK_RESPONSE, UPDATED_RESPONSE, VARS,
     models::{
         cli::Workflow,
         error::Error,
         json_data::{FileDetails, GistResponse, RepositoryPublicKey},
     },
-    verify_repo, CREATED_RESPONSE, OK_RESPONSE, UPDATED_RESPONSE, VARS,
+    verify_repo,
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use crypto_box::{aead::OsRng, PublicKey};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use crypto_box::{PublicKey, aead::OsRng};
 use reqwest::header::{HeaderMap, HeaderValue};
 use std::{
     borrow::Cow,

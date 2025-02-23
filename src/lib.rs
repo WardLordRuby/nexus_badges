@@ -529,8 +529,8 @@ const URL_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b'|');
 
 pub async fn conditional_join<T1, T2>(
-    task1: Option<impl std::future::Future<Output = T1>>,
-    task2: Option<impl std::future::Future<Output = T2>>,
+    task1: Option<impl Future<Output = T1>>,
+    task2: Option<impl Future<Output = T2>>,
 ) -> (Option<T1>, Option<T2>) {
     match (task1, task2) {
         (Some(t1), Some(t2)) => {

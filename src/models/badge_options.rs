@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use percent_encoding::{percent_encode, AsciiSet, PercentEncode};
+use percent_encoding::{AsciiSet, PercentEncode, percent_encode};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     fmt::{Debug, Display},

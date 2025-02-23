@@ -1,4 +1,5 @@
 use crate::{
+    ENV_NAME_GIST_ID, ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, PATHS, StartupVars, VARS,
     check_program_version, conditional_join,
     models::{
         badge_options::BadgePreferences,
@@ -14,8 +15,7 @@ use crate::{
         },
         nexus::update_download_counts,
     },
-    verify_gist, verify_git, verify_repo, verify_repo_from, write, write_badges, StartupVars,
-    ENV_NAME_GIST_ID, ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, PATHS, VARS,
+    verify_gist, verify_git, verify_repo, verify_repo_from, write, write_badges,
 };
 use std::io::{self, ErrorKind};
 
@@ -45,17 +45,12 @@ pub async fn version(on_remote: bool) -> reqwest::Result<()> {
 }
 
 pub trait Modify {
-    fn add_mod(self, details: Mod) -> impl std::future::Future<Output = Result<(), Error>> + Send;
-    fn remove_mod(
-        self,
-        details: Mod,
-    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+    fn add_mod(self, details: Mod) -> impl Future<Output = Result<(), Error>> + Send;
+    fn remove_mod(self, details: Mod) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
 trait Update {
-    fn write_and_try_set_remote(
-        self,
-    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+    fn write_and_try_set_remote(self) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
 impl Update for Vec<Mod> {

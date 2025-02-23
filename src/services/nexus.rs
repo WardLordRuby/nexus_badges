@@ -1,6 +1,7 @@
 use crate::{
+    OK_RESPONSE, PATHS, TOTAL_KEY, VARS,
     models::{cli::Mod, error::Error, json_data::ModDetails},
-    verify_added, verify_nexus, write, OK_RESPONSE, PATHS, TOTAL_KEY, VARS,
+    verify_added, verify_nexus, write,
 };
 use std::{
     collections::BTreeMap,

@@ -2,8 +2,8 @@ use clap::Parser;
 use nexus_badges::{
     await_user_for_end,
     commands::{
-        init_actions, init_remote, process, update_args_local, update_args_remote,
-        update_cache_key, version, Modify,
+        Modify, init_actions, init_remote, process, update_args_local, update_args_remote,
+        update_cache_key, version,
     },
     exit_on_remote,
     models::{
