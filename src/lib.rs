@@ -253,7 +253,7 @@ fn verify_nexus() -> Result<(), Error> {
     if vars.git_token.is_empty() {
         println!(
             "Git fine-grained token missing, Use command 'set' to store private token\n\
-            ouput will be saved locally"
+            output will be saved locally"
         )
     }
     Ok(())
@@ -325,7 +325,7 @@ pub struct StartupVars {
 
 impl StartupVars {
     /// NOTE: this method is not supported on local  
-    /// `nexus_key` and `gist_id` fields are not populated from enviorment variables
+    /// `nexus_key` and `gist_id` fields are not populated from environment variables
     pub fn git_api_only() -> Result<Self, Error> {
         const ENV_NAME_REPO: &str = "REPO_FULL";
 
@@ -381,7 +381,7 @@ impl Input {
         }
     }
 
-    /// `owner` and `repo` fields are not populated from enviorment variables
+    /// `owner` and `repo` fields are not populated from environment variables
     fn from_env() -> Result<Self, Error> {
         Ok(Input {
             git_token: std::env::var(ENV_NAME_GIT)?,

@@ -70,7 +70,7 @@ Use the `set-arg` command again to locate the repository that contains [automati
 ```
 nexus_badges.exe set-arg --owner <GITHUB_NAME> --repo <REPOSITORY_NAME>
 ```
-To initialize the automation workflow on your set repository use the `init-actons` command.
+To initialize the automation workflow on your set repository use the `init-actions` command.
 ```
 nexus_badges.exe init-actions
 ```

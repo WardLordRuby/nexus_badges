@@ -1,3 +1,4 @@
 /target
 /io
 Cargo.lock
+/.vscode

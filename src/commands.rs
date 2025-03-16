@@ -207,7 +207,7 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
 pub async fn update_args_remote(new: SetArgs) -> Result<(), Error> {
     debug_assert!(
         verify_repo().is_ok(),
-        "expects condtion is checked before this fn is called"
+        "expects condition is checked before this fn is called"
     );
 
     let vars = VARS.get().expect("set on startup");

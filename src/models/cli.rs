@@ -27,11 +27,11 @@ pub enum Commands {
     #[command(aliases = ["Set", "set"])]
     SetArg(SetArgs),
 
-    /// Initalize private gist to be used as a json endpoint for badge download counters
+    /// Initialize private gist to be used as a json endpoint for badge download counters
     #[command(alias = "Init")]
     Init,
 
-    /// Initalize GitHub actions to update the remote gist once daily
+    /// Initialize GitHub actions to update the remote gist once daily
     #[command(aliases = ["InitActions", "init_actions", "Init-Actions", "initActions"])]
     InitActions,
 
