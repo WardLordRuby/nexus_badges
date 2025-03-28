@@ -2,7 +2,7 @@ use crate::{
     ENV_NAME_GIST_ID, ENV_NAME_GIT, ENV_NAME_MODS, ENV_NAME_NEXUS, PATHS, StartupVars, VARS,
     check_program_version, conditional_join,
     models::{
-        badge_options::BadgePreferences,
+        badge_options::{BadgeFormat, BadgePreferences},
         cli::{Mod, SetArgs, Workflow},
         error::Error,
         json_data::Input,
@@ -165,11 +165,34 @@ impl BadgePreferences {
             modified = true;
             self.label_color = std::mem::take(color);
         }
+        if let Some(ref mut color) = from.label_color_light_mode {
+            modified = true;
+            if self.label_color.is_some() {
+                self.label_color_light_mode = std::mem::take(color);
+            } else {
+                println!("No base label color set, making {color} the default label color");
+                self.label_color = std::mem::take(color);
+            }
+        }
         if let Some(ref mut color) = from.color {
             modified = true;
             self.color = std::mem::take(color);
         }
         modified
+    }
+
+    pub(crate) fn validate_format(&mut self) -> bool {
+        if self.label_color_light_mode.is_some() && !matches!(self.format, BadgeFormat::GithubHtml)
+        {
+            println!(
+                "Multiple color schemes are only supported with github-html format\n\
+                Set '--label-color-light-mode default' to switch out of github-html mode\n\
+                Format changed to github-html"
+            );
+            self.format = BadgeFormat::GithubHtml;
+            return true;
+        }
+        false
     }
 }
 
@@ -178,7 +201,8 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
     let mut curr_badge = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_default();
 
     let keys_modified = curr_keys.update(new);
-    let pref_modified = curr_badge.update(new);
+    let mut pref_modified = curr_badge.update(new);
+    pref_modified = curr_badge.validate_format() || pref_modified;
 
     let return_res = verify_repo_from(&curr_keys.owner, &curr_keys.repo);
 

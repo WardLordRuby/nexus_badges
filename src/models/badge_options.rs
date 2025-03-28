@@ -6,6 +6,8 @@ use std::{
     str::FromStr,
 };
 
+const IMAGE_ALT_TEXT: &str = "Nexus Downloads";
+
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct BadgePreferences {
@@ -18,40 +20,20 @@ pub struct BadgePreferences {
     pub label_color: Color,
     #[serde(deserialize_with = "deserialize_color")]
     #[serde(skip_serializing_if = "Color::is_none")]
+    pub label_color_light_mode: Color,
+    #[serde(deserialize_with = "deserialize_color")]
+    #[serde(skip_serializing_if = "Color::is_none")]
     pub color: Color,
 }
 
 impl BadgePreferences {
-    fn encode_optionals(&self, ascii_set: &'static AsciiSet) -> String {
-        let mut output = String::new();
-        if let Some(style) = self.style() {
-            output.push_str(&format!("&style={style}"));
-        }
-        if let Some(ref color) = self.label_color.0 {
-            output.push_str(&format!(
-                "&labelColor={}",
-                percent_encode(color.as_bytes(), ascii_set)
-            ));
-        }
-        if let Some(ref color) = self.color.0 {
-            output.push_str(&format!(
-                "&color={}",
-                percent_encode(color.as_bytes(), ascii_set)
-            ));
-        }
-        output
-    }
-
     #[inline]
-    pub fn set_style(&mut self, style: BadgeStyle) {
+    pub(crate) fn set_style(&mut self, style: BadgeStyle) {
         self.style = style
     }
 
-    pub fn style(&self) -> Option<BadgeStyle> {
-        if let BadgeStyle::Flat = self.style {
-            return None;
-        }
-        Some(self.style)
+    pub(crate) fn style(&self) -> Option<BadgeStyle> {
+        (!matches!(self.style, BadgeStyle::Flat)).then_some(self.style)
     }
 }
 
@@ -63,6 +45,7 @@ impl Default for BadgePreferences {
             format: BadgeFormat::default(),
             count: DownloadCount::default(),
             label_color: Color::default(),
+            label_color_light_mode: Color::default(),
             color: Color::default(),
         }
     }
@@ -76,6 +59,13 @@ impl Display for BadgePreferences {
         writeln!(f, "- Style: {}", self.style)?;
         writeln!(f, "- Format: {}", self.format)?;
         writeln!(f, "- Label color: {}", self.label_color)?;
+        if self.label_color_light_mode.is_some() {
+            writeln!(
+                f,
+                "- Label color light mode: {}",
+                self.label_color_light_mode
+            )?;
+        }
         writeln!(f, "- Color: {}", self.color)?;
         Ok(())
     }
@@ -86,8 +76,12 @@ pub struct Color(Option<String>);
 
 impl Color {
     #[inline]
-    pub fn is_none(&self) -> bool {
+    pub(crate) fn is_none(&self) -> bool {
         self.0.is_none()
+    }
+    #[inline]
+    pub(crate) fn is_some(&self) -> bool {
+        self.0.is_some()
     }
 }
 
@@ -180,6 +174,8 @@ pub enum BadgeFormat {
     AsciiDoc,
     #[value(aliases = ["HTML", "Html"])]
     Html,
+    #[value(aliases = ["GitHubHtml", "gitHubHtml", "git-hub-html", "Git-hub-html","git_hub_html"])]
+    GithubHtml,
 }
 
 impl Display for BadgeFormat {
@@ -191,6 +187,7 @@ impl Display for BadgeFormat {
                 BadgeFormat::Markdown => "markdown",
                 BadgeFormat::AsciiDoc => "asciiDoc",
                 BadgeFormat::Html => "html",
+                BadgeFormat::GithubHtml => "gitHub-Html",
                 BadgeFormat::Rst => "rst",
                 BadgeFormat::Url => "url",
             }
@@ -198,83 +195,153 @@ impl Display for BadgeFormat {
     }
 }
 
-fn dynamic_badge_url(
-    ascii_set: &'static AsciiSet,
-    encoded_data: &EncodedFields,
-    query: &str,
-) -> String {
-    format!(
-        "https://img.shields.io/badge/dynamic/json?url={}&query={}&label={}{}",
-        encoded_data.json_url,
-        percent_encode(query.as_bytes(), ascii_set),
-        encoded_data.label,
-        encoded_data.option_fields
-    )
-}
-
-fn dynamic_badge_url_with_link(
-    ascii_set: &'static AsciiSet,
-    encoded_data: &EncodedFields,
-    query: &str,
-    url: &str,
-) -> String {
-    format!(
-        "{}&link={}",
-        dynamic_badge_url(ascii_set, encoded_data, query),
-        percent_encode(url.as_bytes(), ascii_set)
-    )
-}
-
 pub struct EncodedFields<'a> {
     json_url: PercentEncode<'a>,
-    label: PercentEncode<'a>,
-    option_fields: String,
+    label_text: PercentEncode<'a>,
+    badge_style: Option<BadgeStyle>,
+    label_color: Option<PercentEncode<'a>>,
+    label_color_light_mode: Option<PercentEncode<'a>>,
+    color: Option<PercentEncode<'a>>,
 }
 
-impl<'a> EncodedFields<'a> {
-    pub fn new(
-        json_url: &'a str,
-        badge_prefs: &'a BadgePreferences,
+impl EncodedFields<'_> {
+    fn dynamic_badge_url(
+        &self,
+        query: &str,
         ascii_set: &'static AsciiSet,
-    ) -> Self {
+    ) -> (String, Option<String>) {
+        let mut badge_url = format!(
+            "https://img.shields.io/badge/dynamic/json?url={}&query={}&label={}",
+            self.json_url,
+            percent_encode(query.as_bytes(), ascii_set),
+            self.label_text
+        );
+
+        if let Some(style) = self.badge_style {
+            badge_url.push_str(&format!("&style={style}"));
+        }
+
+        if let Some(ref color) = self.color {
+            badge_url.push_str(&format!("&color={color}"));
+        }
+
+        let light_mode_url = self
+            .label_color_light_mode
+            .as_ref()
+            .map(|color| format!("{badge_url}&labelColor={color}"));
+
+        if let Some(ref color) = self.label_color {
+            badge_url.push_str(&format!("&labelColor={color}"));
+        }
+
+        (badge_url, light_mode_url)
+    }
+
+    fn dynamic_badge_url_with_link(
+        &self,
+        query: &str,
+        url: &str,
+        ascii_set: &'static AsciiSet,
+    ) -> (String, Option<String>) {
+        let (mut badge_url, light_mode_badge) = self.dynamic_badge_url(query, ascii_set);
+
+        badge_url = format!(
+            "{badge_url}&link={}",
+            percent_encode(url.as_bytes(), ascii_set)
+        );
+        (badge_url, light_mode_badge)
+    }
+}
+
+impl<'a> BadgePreferences {
+    pub(crate) fn encoded_fields(
+        &'a self,
+        json_url: &'a str,
+        ascii_set: &'static AsciiSet,
+    ) -> EncodedFields<'a> {
+        let percent_encode_str = |str: &'a str| percent_encode(str.as_bytes(), ascii_set);
+
         EncodedFields {
-            json_url: percent_encode(json_url.as_bytes(), ascii_set),
-            label: percent_encode(badge_prefs.label.as_bytes(), ascii_set),
-            option_fields: badge_prefs.encode_optionals(ascii_set),
+            json_url: percent_encode_str(json_url),
+            label_text: percent_encode_str(&self.label),
+            badge_style: self.style(),
+            label_color: self.label_color.0.as_deref().map(percent_encode_str),
+            label_color_light_mode: self
+                .label_color_light_mode
+                .0
+                .as_deref()
+                .map(percent_encode_str),
+            color: self.color.0.as_deref().map(percent_encode_str),
         }
     }
 }
 
 impl BadgeFormat {
-    pub fn write_badge(
+    fn html_img_tag(badge_url: &str) -> String {
+        format!("<img src=\"{badge_url}\" alt=\"{IMAGE_ALT_TEXT}\">")
+    }
+
+    pub(crate) fn write_badge(
         &self,
         f: &mut impl std::io::Write,
         ascii_set: &'static AsciiSet,
         encoded_data: &EncodedFields,
         query: &str,
-        url: &str,
+        link_url: &str,
     ) -> std::io::Result<()> {
-        const IMAGE_ALT_TEXT: &str = "Nexus Downloads";
+        let (mut badge_url, mut light_mode_badge_url) =
+            if matches!(self, Self::Markdown | Self::GithubHtml) || link_url.is_empty() {
+                encoded_data.dynamic_badge_url(query, ascii_set)
+            } else {
+                assert!(
+                    encoded_data.label_color_light_mode.is_none(),
+                    "condition checked prior via `validate_format`"
+                );
 
-        let badge_url = if matches!(self, BadgeFormat::Markdown) || url.is_empty() {
-            dynamic_badge_url(ascii_set, encoded_data, query)
-        } else {
-            dynamic_badge_url_with_link(ascii_set, encoded_data, query, url)
-        };
+                encoded_data.dynamic_badge_url_with_link(query, link_url, ascii_set)
+            };
 
         writeln!(f, "```{self}")?;
         match self {
-            BadgeFormat::Markdown => {
-                if url.is_empty() {
+            Self::Markdown => {
+                if link_url.is_empty() {
                     writeln!(f, "![{IMAGE_ALT_TEXT}]({badge_url})")?
                 } else {
-                    writeln!(f, "[![{IMAGE_ALT_TEXT}]({badge_url})]({url})")?
+                    writeln!(f, "[![{IMAGE_ALT_TEXT}]({badge_url})]({link_url})")?
                 }
             }
-            BadgeFormat::AsciiDoc => writeln!(f, "image:{badge_url}[{IMAGE_ALT_TEXT}]")?,
-            BadgeFormat::Html => writeln!(f, "<img alt=\"{IMAGE_ALT_TEXT}\" src=\"{badge_url}\">")?,
-            BadgeFormat::Rst => writeln!(f, ".. image:: {badge_url}\n  :alt: {IMAGE_ALT_TEXT}")?,
-            BadgeFormat::Url => writeln!(f, "{badge_url}")?,
+            Self::AsciiDoc => writeln!(f, "image:{badge_url}[{IMAGE_ALT_TEXT}]")?,
+            Self::Html => writeln!(f, "{}", Self::html_img_tag(&badge_url))?,
+            Self::GithubHtml => {
+                if !link_url.is_empty() {
+                    write!(f, "[")?
+                }
+
+                if let Some(light_mode_url) = light_mode_badge_url.as_mut() {
+                    write!(
+                        f,
+                        "<picture>\n    \
+                        <source media=\"(prefers-color-scheme: dark)\" srcset=\"{badge_url}\">\n    "
+                    )?;
+                    std::mem::swap(light_mode_url, &mut badge_url);
+                }
+
+                write!(f, "{}", Self::html_img_tag(&badge_url))?;
+
+                if light_mode_badge_url.is_some() {
+                    write!(f, "\n</picture>")?;
+                }
+
+                writeln!(
+                    f,
+                    "{}",
+                    (!link_url.is_empty())
+                        .then(|| format!("]({link_url})"))
+                        .unwrap_or_default()
+                )?;
+            }
+            Self::Rst => writeln!(f, ".. image:: {badge_url}\n  :alt: {IMAGE_ALT_TEXT}")?,
+            Self::Url => writeln!(f, "{badge_url}")?,
         }
         writeln!(f, "```")
     }

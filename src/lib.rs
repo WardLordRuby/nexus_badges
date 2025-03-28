@@ -12,7 +12,7 @@ pub mod services {
 
 use crate::{
     models::{
-        badge_options::{BadgePreferences, EncodedFields},
+        badge_options::BadgePreferences,
         cli::{Commands, Mod},
         error::Error,
         json_data::{GistResponse, Input, ModDetails, Version},
@@ -449,14 +449,16 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
     let file = File::create(PATHS.badges.as_ref())?;
     let mut writer = BufWriter::new(file);
 
-    let badge_prefs = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_else(|err| {
+    let mut badge_prefs = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_else(|err| {
         if !matches!(&err, Error::Io(err) if err.kind() == ErrorKind::NotFound) {
             eprintln!("{err}, using default styling")
         }
         BadgePreferences::default()
     });
 
-    let encoded_fields = EncodedFields::new(universal_url, &badge_prefs, URL_ENCODE_SET);
+    let badges_modified = badge_prefs.validate_format();
+
+    let encoded_fields = badge_prefs.encoded_fields(universal_url, URL_ENCODE_SET);
 
     writeln!(writer, "# Shields.io Badges via Nexus Badges")?;
     writeln!(writer, "Base template: {BADGE_URL}")?;
@@ -483,6 +485,10 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
     }
 
     writer.flush()?;
+
+    if badges_modified {
+        write(badge_prefs, &PATHS.preferences)?;
+    }
 
     println!("Badges saved to: {}", PATHS.badges);
     Ok(())
