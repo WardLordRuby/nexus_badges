@@ -18,7 +18,7 @@ impl Mod {
             self.domain, self.mod_id
         )
     }
-    pub fn url(&self) -> String {
+    pub(crate) fn url(&self) -> String {
         format!(
             "https://www.nexusmods.com/{}/mods/{}",
             self.domain, self.mod_id
@@ -31,7 +31,7 @@ async fn abort_and_wait<T: 'static>(tasks: &mut JoinSet<T>) {
     while tasks.join_next().await.is_some() {}
 }
 
-pub async fn update_download_counts(
+pub(crate) async fn update_download_counts(
     mods: Vec<Mod>,
     on_remote: bool,
 ) -> Result<BTreeMap<String, ModDetails>, Error> {

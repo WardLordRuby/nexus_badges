@@ -46,7 +46,7 @@ impl GistResponse {
     }
 }
 
-pub fn gist_id_endpoint() -> String {
+pub(crate) fn gist_id_endpoint() -> String {
     format!(
         "{GIT_BASE_URL}/gists/{}",
         VARS.get().expect("set on startup").gist_id
@@ -159,7 +159,7 @@ pub async fn set_workflow_state(state: Workflow) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn set_repository_variable(name: &str, value: &str) -> Result<(), Error> {
+pub(crate) async fn set_repository_variable(name: &str, value: &str) -> Result<(), Error> {
     let build = |request: reqwest::RequestBuilder| {
         request
             .headers(git_header())
@@ -188,7 +188,7 @@ pub async fn set_repository_variable(name: &str, value: &str) -> Result<(), Erro
     Err(Error::BadResponse(create_response.text().await?))
 }
 
-pub async fn create_remote(content: String) -> Result<GistResponse, Error> {
+pub(crate) async fn create_remote(content: String) -> Result<GistResponse, Error> {
     let server_response = reqwest::Client::new()
         .post(gist_endpoint())
         .headers(git_header())
@@ -216,7 +216,10 @@ pub async fn create_remote(content: String) -> Result<GistResponse, Error> {
         .map_err(Error::from)
 }
 
-pub async fn update_remote(gist_endpoint: &str, content: String) -> Result<GistResponse, Error> {
+pub(crate) async fn update_remote(
+    gist_endpoint: &str,
+    content: String,
+) -> Result<GistResponse, Error> {
     let server_response = reqwest::Client::new()
         .patch(gist_endpoint)
         .headers(git_header())
@@ -242,7 +245,7 @@ pub async fn update_remote(gist_endpoint: &str, content: String) -> Result<GistR
         .map_err(Error::from)
 }
 
-pub async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Error> {
+pub(crate) async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Error> {
     let server_response = reqwest::Client::new()
         .get(gist_endpoint)
         .headers(git_header())
@@ -259,7 +262,7 @@ pub async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Error> {
         .map_err(Error::from)
 }
 
-pub async fn get_public_key() -> Result<RepositoryPublicKey, Error> {
+pub(crate) async fn get_public_key() -> Result<RepositoryPublicKey, Error> {
     let server_response = reqwest::Client::new()
         .get(repository_public_key_endpoint())
         .headers(git_header())
@@ -276,7 +279,7 @@ pub async fn get_public_key() -> Result<RepositoryPublicKey, Error> {
         .map_err(Error::from)
 }
 
-pub async fn set_repository_secret(
+pub(crate) async fn set_repository_secret(
     secret_name: &str,
     secret: &str,
     public_key: &RepositoryPublicKey,
@@ -314,7 +317,7 @@ fn encrypt_secret(secret: &str, public_key: &str) -> Result<String, Error> {
     Ok(BASE64.encode(&encrypted_bytes))
 }
 
-pub async fn delete_cache_by_key(key: &str) -> Result<(), Error> {
+pub(crate) async fn delete_cache_by_key(key: &str) -> Result<(), Error> {
     let server_response = reqwest::Client::new()
         .delete(repository_cache_endpoint(key))
         .headers(git_header())

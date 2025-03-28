@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize, Default, Clone)]
 #[serde(default)]
-pub struct Input {
+pub(crate) struct Input {
     pub git_token: String,
     pub nexus_key: String,
     pub gist_id: String,
@@ -14,7 +14,7 @@ pub struct Input {
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct ModDetails {
+pub(crate) struct ModDetails {
     pub name: String,
     #[serde(skip_deserializing)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -26,25 +26,25 @@ pub struct ModDetails {
 }
 
 #[derive(Deserialize)]
-pub struct GistResponse {
+pub(crate) struct GistResponse {
     pub id: String,
     pub files: HashMap<String, FileDetails>,
 }
 
 #[derive(Deserialize)]
-pub struct FileDetails {
+pub(crate) struct FileDetails {
     pub raw_url: String,
     pub content: String,
 }
 
 #[derive(Deserialize)]
-pub struct Version {
+pub(crate) struct Version {
     pub latest: String,
     pub message: String,
 }
 
 #[derive(Deserialize)]
-pub struct RepositoryPublicKey {
+pub(crate) struct RepositoryPublicKey {
     pub key_id: String,
     pub key: String,
 }
