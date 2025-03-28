@@ -1,3 +1,11 @@
+nexus-badges (0.3.3) unreleased; urgency=low
+
+  * Added new badge format 'github-html'. This format allows users to
+    set separate label-colors to be displayed dependent of the browsers
+    preferred color scheme.
+
+ -- WardLordRuby <@7thWardLord Discord>  Fri, 28 Mar 2025 8:00:00 +0000
+
 nexus-badges (0.3.2) stable; urgency=low
 
   * Added additional badge that totals downloads of all tracked mods
