@@ -181,18 +181,14 @@ impl BadgePreferences {
         modified
     }
 
-    pub(crate) fn validate_format(&mut self) -> bool {
+    pub(crate) fn validate_format(&mut self) {
         if self.label_color_light_mode.is_some() && !matches!(self.format, BadgeFormat::GithubHtml)
         {
             println!(
                 "Multiple color schemes are only supported with github-html format\n\
-                Set '--label-color-light-mode default' to switch out of github-html mode\n\
-                Format changed to github-html"
+                '--label-color-light-mode' will be ignored when generating badges"
             );
-            self.format = BadgeFormat::GithubHtml;
-            return true;
         }
-        false
     }
 }
 
@@ -201,8 +197,7 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
     let mut curr_badge = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_default();
 
     let keys_modified = curr_keys.update(new);
-    let mut pref_modified = curr_badge.update(new);
-    pref_modified = curr_badge.validate_format() || pref_modified;
+    let pref_modified = curr_badge.update(new);
 
     let return_res = verify_repo_from(&curr_keys.owner, &curr_keys.repo);
 

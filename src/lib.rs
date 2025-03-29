@@ -456,7 +456,7 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
         BadgePreferences::default()
     });
 
-    let badges_modified = badge_prefs.validate_format();
+    badge_prefs.validate_format();
 
     let encoded_fields = badge_prefs.encoded_fields(universal_url, URL_ENCODE_SET);
 
@@ -485,10 +485,6 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
     }
 
     writer.flush()?;
-
-    if badges_modified {
-        write(badge_prefs, &PATHS.preferences)?;
-    }
 
     println!("Badges saved to: {}", PATHS.badges);
     Ok(())

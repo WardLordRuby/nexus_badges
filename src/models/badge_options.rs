@@ -59,7 +59,7 @@ impl Display for BadgePreferences {
         writeln!(f, "- Style: {}", self.style)?;
         writeln!(f, "- Format: {}", self.format)?;
         writeln!(f, "- Label color: {}", self.label_color)?;
-        if self.label_color_light_mode.is_some() {
+        if self.label_color_light_mode.is_some() && matches!(self.format, BadgeFormat::GithubHtml) {
             writeln!(
                 f,
                 "- Label color light mode: {}",
@@ -207,6 +207,7 @@ pub struct EncodedFields<'a> {
 impl EncodedFields<'_> {
     fn dynamic_badge_url(
         &self,
+        light_mode_valid: bool,
         query: &str,
         ascii_set: &'static AsciiSet,
     ) -> (String, Option<String>) {
@@ -228,6 +229,7 @@ impl EncodedFields<'_> {
         let light_mode_url = self
             .label_color_light_mode
             .as_ref()
+            .filter(|_| light_mode_valid)
             .map(|color| format!("{badge_url}&labelColor={color}"));
 
         if let Some(ref color) = self.label_color {
@@ -243,13 +245,13 @@ impl EncodedFields<'_> {
         url: &str,
         ascii_set: &'static AsciiSet,
     ) -> (String, Option<String>) {
-        let (mut badge_url, light_mode_badge) = self.dynamic_badge_url(query, ascii_set);
+        let (mut badge_url, _) = self.dynamic_badge_url(false, query, ascii_set);
 
         badge_url = format!(
             "{badge_url}&link={}",
             percent_encode(url.as_bytes(), ascii_set)
         );
-        (badge_url, light_mode_badge)
+        (badge_url, None)
     }
 }
 
@@ -289,15 +291,12 @@ impl BadgeFormat {
         query: &str,
         link_url: &str,
     ) -> std::io::Result<()> {
-        let (mut badge_url, mut light_mode_badge_url) =
-            if matches!(self, Self::Markdown | Self::GithubHtml) || link_url.is_empty() {
-                encoded_data.dynamic_badge_url(query, ascii_set)
-            } else {
-                assert!(
-                    encoded_data.label_color_light_mode.is_none(),
-                    "condition checked prior via `validate_format`"
-                );
+        let github_html_fmt = matches!(self, Self::GithubHtml);
 
+        let (mut badge_url, mut light_mode_badge_url) =
+            if link_url.is_empty() || github_html_fmt || matches!(self, Self::Markdown) {
+                encoded_data.dynamic_badge_url(github_html_fmt, query, ascii_set)
+            } else {
                 encoded_data.dynamic_badge_url_with_link(query, link_url, ascii_set)
             };
 
