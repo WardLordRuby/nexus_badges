@@ -1,4 +1,5 @@
-/target
-/io
+.vscode
+io
+target
+build/debforge.exe
 Cargo.lock
-/.vscode

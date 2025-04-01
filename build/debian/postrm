@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    purge)
+        for user in $(getent passwd | awk -F: '$3 >= 1000' | cut -d: -f6); do
+            config_dir="$user/.config/$LinuxBinaryName"
+            if [ -d "$config_dir" ]; then
+                rm -rf "$config_dir"
+            fi
+        done
+        ;;
+esac
+
+exit 0

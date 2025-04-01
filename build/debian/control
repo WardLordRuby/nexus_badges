@@ -1,0 +1,13 @@
+Package: $LinuxBinaryName
+Version: $Version
+Section: utils
+Priority: optional
+Architecture: $Architecture
+Maintainer: WardLordRuby
+Depends: libc6 (>= 2.28), libgcc1
+Description: Shields.io badge generator for Nexus Mods
+ The Nexus Mod Badges package includes various badge formats for showing mod
+ statistics such as total downloads, unique downloads, and more. This package
+ includes badges for different output formats including Markdown, HTML, and
+ others. It is designed to be easily integrated with websites, README files,
+ or any other platform supporting badges.

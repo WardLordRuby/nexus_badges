@@ -3,7 +3,6 @@ FROM debian:stable-slim
 # Install required packages
 RUN apt-get update && \
     apt-get install -y dpkg-dev && \
-    apt-get install -y dos2unix && \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /build
 

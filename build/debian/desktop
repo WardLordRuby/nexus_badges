@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=$Version
+Type=Application
+Name=$LinuxBinaryName
+Exec=/usr/local/bin/$LinuxBinaryName
+Icon=$LinuxBinaryName
+Categories=Utility;
+Terminal=true
