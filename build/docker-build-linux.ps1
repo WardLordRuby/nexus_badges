@@ -18,12 +18,6 @@ if ($Target -eq "x86_64-unknown-linux-gnu") {
 # Ensure BinaryName is linux friendly
 $LinuxBinaryName = $BinaryName.Replace('_', '-')
 
-# Capture the current directory at the start
-Push-Location
-
-# Ensure script always has the same working directory
-Set-Location -Path $PSScriptRoot
-
 # Change to project root
 Push-Location (Split-Path -Parent $PSScriptRoot)
 
@@ -62,10 +56,12 @@ try {
 
     # Run the container
     if (docker run --rm -v "${PWD}/build/tmp:/build/tmp" $ImageName -and $?) {
-        Write-Host "Done! Package created in target/$Target/release/"
-
         Move-Item "build/tmp/dist/linux/$LinuxBinaryName-$Version.deb" `
             "target/$Target/release/${BinaryName}_linux_${Architecture}.deb" -Force
+
+        if ($LASTEXITCODE -eq 0) { 
+            Write-Host "Done! Package created in target/$Target/release/"            
+        }
     }
 
 } finally {

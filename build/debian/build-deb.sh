@@ -1,14 +1,21 @@
 #!/bin/bash
 set -e
 
-# Check if package directory exists
-if [ -z "$(ls -A /build/tmp/dist/linux)" ]; then
-    echo "Error: No package found in /build/tmp/dist/linux"
+DIST="/build/tmp/dist/linux"
+
+# Check if dist is overwritten
+if [[ -n "$1" && "$1" != -* ]]; then
+    DIST="$1"
+fi
+
+# Check if dist directory exists
+if [ -z "$(ls -A "$DIST")" ]; then
+    echo "Error: linux distribution directory: "$DIST", not found"
     exit 1
 fi
 
 # Find desired directories
-PACKAGE_DIR=$(ls -d /build/tmp/dist/linux/* | head -n 1)
+PACKAGE_DIR=$(ls -d "$DIST/"* | head -n 1)
 PACKAGE=$(basename "$PACKAGE_DIR")
 LINUX_BINARY_NAME=${PACKAGE%-*}
 CHANGELOG_DIR="$PACKAGE_DIR/usr/share/doc/$LINUX_BINARY_NAME"
