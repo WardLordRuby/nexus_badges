@@ -45,8 +45,8 @@ pub async fn version(on_remote: bool) -> reqwest::Result<()> {
 }
 
 pub trait Modify {
-    fn add_mod(self, details: Mod) -> impl Future<Output = Result<(), Error>> + Send;
-    fn remove_mod(self, details: Mod) -> impl Future<Output = Result<(), Error>> + Send;
+    fn push_mod(self, details: Mod) -> impl Future<Output = Result<(), Error>> + Send;
+    fn swap_remove_mod(self, details: &Mod) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
 trait Update {
@@ -73,7 +73,7 @@ impl Update for Vec<Mod> {
 }
 
 impl Modify for Vec<Mod> {
-    async fn add_mod(mut self, details: Mod) -> Result<(), Error> {
+    async fn push_mod(mut self, details: Mod) -> Result<(), Error> {
         if self.contains(&details) {
             return Err(Error::Io(io::Error::new(
                 ErrorKind::InvalidInput,
@@ -87,10 +87,10 @@ impl Modify for Vec<Mod> {
         Ok(())
     }
 
-    async fn remove_mod(mut self, details: Mod) -> Result<(), Error> {
+    async fn swap_remove_mod(mut self, details: &Mod) -> Result<(), Error> {
         let i = self
             .iter()
-            .position(|mod_details| *mod_details == details)
+            .position(|mod_details| mod_details == details)
             .ok_or_else(|| {
                 Error::Io(io::Error::new(
                     ErrorKind::InvalidInput,
@@ -181,7 +181,7 @@ impl BadgePreferences {
         modified
     }
 
-    pub(crate) fn validate_format(&mut self) {
+    pub(crate) fn validate_format(&self) {
         if self.label_color_light_mode.is_some() && !matches!(self.format, BadgeFormat::GithubHtml)
         {
             println!(

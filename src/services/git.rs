@@ -1,5 +1,5 @@
 use crate::{
-    CREATED_RESPONSE, OK_RESPONSE, UPDATED_RESPONSE, VARS,
+    CREATED, OK, VARS,
     models::{
         cli::Workflow,
         error::Error,
@@ -24,6 +24,9 @@ const GIST_DESC: &str = "Private gist to be used as a json endpoint for badge do
 
 const WORKFLOW_NAME: &str = "automation.yml";
 const RAW: &str = "/raw/";
+
+// GitHub REST API uses 'No Content'(204) for the successful return of updated content and flag changes
+const UPDATED: reqwest::StatusCode = reqwest::StatusCode::NO_CONTENT;
 
 impl GistResponse {
     fn file_details(&self) -> Result<&FileDetails, Error> {
@@ -151,7 +154,7 @@ pub async fn set_workflow_state(state: Workflow) -> Result<(), Error> {
         .send()
         .await?;
 
-    if server_response.status() != UPDATED_RESPONSE {
+    if server_response.status() != UPDATED {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -172,7 +175,7 @@ pub(crate) async fn set_repository_variable(name: &str, value: &str) -> Result<(
     let update_request = reqwest::Client::new().patch(repository_variable_endpoint(name));
     let update_response = build(update_request).await?;
 
-    if update_response.status() == UPDATED_RESPONSE {
+    if update_response.status() == UPDATED {
         println!("Repository variable: {name}, updated");
         return Ok(());
     }
@@ -180,7 +183,7 @@ pub(crate) async fn set_repository_variable(name: &str, value: &str) -> Result<(
     let create_request = reqwest::Client::new().post(repository_variables_endpoint());
     let create_response = build(create_request).await?;
 
-    if create_response.status() == CREATED_RESPONSE {
+    if create_response.status() == CREATED {
         println!("Repository variable: {name}, created");
         return Ok(());
     }
@@ -204,7 +207,7 @@ pub(crate) async fn create_remote(content: String) -> Result<GistResponse, Error
         .send()
         .await?;
 
-    if server_response.status() != CREATED_RESPONSE {
+    if server_response.status() != CREATED {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -233,7 +236,7 @@ pub(crate) async fn update_remote(
         .send()
         .await?;
 
-    if server_response.status() != OK_RESPONSE {
+    if server_response.status() != OK {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -252,7 +255,7 @@ pub(crate) async fn get_remote(gist_endpoint: &str) -> Result<GistResponse, Erro
         .send()
         .await?;
 
-    if server_response.status() != OK_RESPONSE {
+    if server_response.status() != OK {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -269,7 +272,7 @@ pub(crate) async fn get_public_key() -> Result<RepositoryPublicKey, Error> {
         .send()
         .await?;
 
-    if server_response.status() != OK_RESPONSE {
+    if server_response.status() != OK {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 
@@ -299,8 +302,8 @@ pub(crate) async fn set_repository_secret(
     let print_status = |status: &str| println!("Repository secret: {secret_name}, {status}");
 
     match server_response.status() {
-        s if s == CREATED_RESPONSE => print_status("created"),
-        s if s == UPDATED_RESPONSE => print_status("updated"),
+        CREATED => print_status("created"),
+        UPDATED => print_status("updated"),
         _ => return Err(Error::BadResponse(server_response.text().await?)),
     }
 
@@ -324,7 +327,7 @@ pub(crate) async fn delete_cache_by_key(key: &str) -> Result<(), Error> {
         .send()
         .await?;
 
-    if server_response.status() != OK_RESPONSE {
+    if server_response.status() != OK {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 

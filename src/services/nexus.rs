@@ -1,5 +1,5 @@
 use crate::{
-    OK_RESPONSE, PATHS, TOTAL_KEY, VARS,
+    OK, PATHS, TOTAL_KEY, VARS,
     models::{cli::Mod, error::Error, json_data::ModDetails},
     verify_added, verify_nexus, write,
 };
@@ -94,7 +94,7 @@ async fn try_get_info(details: Mod, client: reqwest::Client) -> Result<ModDetail
         .send()
         .await?;
 
-    if server_response.status() != OK_RESPONSE {
+    if server_response.status() != OK {
         return Err(Error::BadResponse(server_response.text().await?));
     }
 

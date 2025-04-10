@@ -21,6 +21,7 @@ use crate::{
 };
 use constcat::concat;
 use percent_encoding::{AsciiSet, CONTROLS};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
@@ -46,9 +47,8 @@ const ENV_NAME_GIT: &str = "GIT_TOKEN";
 const ENV_NAME_GIST_ID: &str = "GIST_ID";
 const ENV_NAME_MODS: &str = "TRACKED_MODS";
 
-pub const OK_RESPONSE: u16 = 200;
-pub const CREATED_RESPONSE: u16 = 201;
-pub const UPDATED_RESPONSE: u16 = 204;
+pub const OK: StatusCode = StatusCode::OK;
+pub const CREATED: StatusCode = StatusCode::CREATED;
 
 const VERSION_URL: &str =
     "https://gist.githubusercontent.com/WardLordRuby/b7ae290f2a7f1a20e9795170965c4a46/raw";
@@ -449,7 +449,7 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
     let file = File::create(PATHS.badges.as_ref())?;
     let mut writer = BufWriter::new(file);
 
-    let mut badge_prefs = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_else(|err| {
+    let badge_prefs = read::<BadgePreferences>(&PATHS.preferences).unwrap_or_else(|err| {
         if !matches!(&err, Error::Io(err) if err.kind() == ErrorKind::NotFound) {
             eprintln!("{err}, using default styling")
         }

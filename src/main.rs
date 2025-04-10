@@ -58,8 +58,8 @@ async fn main() {
         unsupported!(command, on_remote, cli.remote);
         match command {
             Commands::SetArg(args) => print_err!(update_args_remote(args).await),
-            Commands::Add(details) => print_err!(input_mods.add_mod(details).await),
-            Commands::Remove(details) => print_err!(input_mods.remove_mod(details).await),
+            Commands::Add(details) => print_err!(input_mods.push_mod(details).await),
+            Commands::Remove(details) => print_err!(input_mods.swap_remove_mod(&details).await),
             Commands::Init => print_err!(init_remote(input_mods).await),
             Commands::InitActions => print_err!(init_actions(input_mods).await),
             Commands::Automation { state } => print_err!(set_workflow_state(state).await),
