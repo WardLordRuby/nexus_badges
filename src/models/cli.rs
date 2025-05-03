@@ -76,16 +76,16 @@ pub struct SetArgs {
     /// Github fine-grained private token with read/write permissions for gists
     /// {n}  [Additional permissions are required for automation via GitHub actions
     /// {n}  refer to documentation at https://github.com/WardLordRuby/nexus_badges]
-    #[arg(long, alias = "git-token")]
+    #[arg(long, alias = "git-token", value_name = "FINE_GRAINED_TOKEN")]
     pub git: Option<String>,
 
     /// Nexus private api key
-    #[arg(long, alias = "nexus-key")]
+    #[arg(long, alias = "nexus-key", value_name = "API_KEY")]
     pub nexus: Option<String>,
 
     /// Identifier of the target remote Gist
     /// {n}  [This value is automatically set by the `init` command]
-    #[arg(long, alias = "gist-id")]
+    #[arg(long, alias = "gist-id", value_name = "ID")]
     pub gist: Option<String>,
 
     /// Your GitHub user name [Required for GitHub actions setup]
@@ -112,12 +112,12 @@ pub struct SetArgs {
 
     /// Specify a hex color for label side of the badge
     /// {n}  [Tip: input colors as '#23282e' or 23282e]
-    #[arg(long)]
+    #[arg(long, value_name = "COLOR")]
     pub label_color: Option<Color>,
 
     /// Specify a hex color for label side of the badge
     /// {n}  [Note: Providing a light mode theme will force a badges to output as github-html]
-    #[arg(long)]
+    #[arg(long, value_name = "COLOR")]
     pub label_color_light_mode: Option<Color>,
 
     /// Specify a hex color for counter side of the badge
