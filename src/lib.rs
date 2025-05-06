@@ -136,10 +136,7 @@ fn init_paths() -> FilePaths {
     );
 
     #[cfg(target_os = "macos")]
-    let base = format!(
-        "{home}/Library/{}",
-        camel_case(env!("CARGO_PKG_NAME"), true)
-    );
+    let base = format!("{home}/Library/{}", pascal_case(env!("CARGO_PKG_NAME")));
 
     FilePaths {
         input: Cow::Owned(format!("{base}/{INPUT_FILE_NAME}")),
@@ -166,34 +163,37 @@ impl FilePaths {
 }
 
 #[cfg(target_os = "macos")]
-fn camel_case(input: &str, capitalize_first: bool) -> String {
+fn pascal_case(input: &str) -> String {
     const SEPARATORS: [char; 2] = ['-', '_'];
 
-    let mut capitalize_next = false;
     let input = input.to_lowercase();
-    input
-        .trim()
-        .trim_matches(SEPARATORS)
-        .char_indices()
-        .filter_map(|(i, ch)| {
-            if i == 0 {
-                return Some(if capitalize_first {
-                    ch.to_ascii_uppercase()
-                } else {
-                    ch
-                });
-            }
+
+    let mut chars = input.trim().trim_matches(SEPARATORS).chars();
+    let Some(first_ch) = chars.next() else {
+        return String::new();
+    };
+
+    let init_out = || {
+        let mut out = String::with_capacity(input.len());
+        out.push(first_ch.to_ascii_uppercase());
+        (out, false)
+    };
+
+    chars
+        .fold(init_out(), |(mut out, capitalize_next), ch| {
             if ch.is_whitespace() || SEPARATORS.iter().any(|&s| s == ch) {
-                capitalize_next = true;
-                return None;
+                return (out, true);
             }
+
             if capitalize_next {
-                capitalize_next = false;
-                return Some(ch.to_ascii_uppercase());
+                out.push(ch.to_ascii_uppercase());
+            } else {
+                out.push(ch);
             }
-            Some(ch)
+
+            (out, false)
         })
-        .collect()
+        .0
 }
 
 impl Display for Commands {
