@@ -153,7 +153,7 @@ impl Display for DownloadCount {
 }
 
 impl DownloadCount {
-    pub fn field_name(&self) -> &'static str {
+    pub(crate) fn field_name(&self) -> &'static str {
         match self {
             DownloadCount::Total => "mod_downloads",
             DownloadCount::Unique => "mod_unique_downloads",

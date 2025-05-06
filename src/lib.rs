@@ -205,11 +205,11 @@ impl Display for Commands {
                 Commands::Add(_) => "add",
                 Commands::Remove(_) => "remove",
                 Commands::SetArg(_) => "set-arg",
-                Commands::Automation { state: _ } => "automation",
+                Commands::Automation { .. } => "automation",
                 Commands::Init => "init",
                 Commands::InitActions => "init-actions",
                 Commands::Version => "version",
-                Commands::UpdateCacheKey { old: _, new: _ } => "repo-variable",
+                Commands::UpdateCacheKey { .. } => "repo-variable",
             }
         )
     }
@@ -326,7 +326,7 @@ pub struct StartupVars {
 impl StartupVars {
     /// NOTE: this method is not supported on local  
     /// `nexus_key` and `gist_id` fields are not populated from environment variables
-    pub fn git_api_only() -> Result<Self, Error> {
+    pub(crate) fn git_api_only() -> Result<Self, Error> {
         const ENV_NAME_REPO: &str = "REPO_FULL";
 
         let (owner, repo) = std::env::var(ENV_NAME_REPO)?
@@ -355,7 +355,7 @@ impl From<&mut Input> for StartupVars {
 }
 
 impl Input {
-    pub fn from(startup: &StartupVars, mods: Vec<Mod>) -> Self {
+    pub(crate) fn from(startup: &StartupVars, mods: Vec<Mod>) -> Self {
         Input {
             git_token: startup.git_token.clone(),
             nexus_key: startup.nexus_key.clone(),
@@ -432,14 +432,14 @@ pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
     Ok(input.mods)
 }
 
-pub fn read<T: for<'de> Deserialize<'de>>(path: &str) -> Result<T, Error> {
+pub(crate) fn read<T: for<'de> Deserialize<'de>>(path: &str) -> Result<T, Error> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let data = serde_json::from_reader(reader)?;
     Ok(data)
 }
 
-pub fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
+pub(crate) fn write<T: Serialize>(data: T, path: &str) -> Result<(), Error> {
     let file = File::create(path)?;
     serde_json::to_writer_pretty(file, &data)?;
     Ok(())

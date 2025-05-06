@@ -37,14 +37,14 @@ impl GistResponse {
         })
     }
 
-    pub fn universal_url(&self) -> Result<&str, Error> {
+    pub(crate) fn universal_url(&self) -> Result<&str, Error> {
         self.file_details().map(|entry| {
             let i = entry.raw_url.find(RAW).expect("always contains `RAW`");
             &entry.raw_url[..i + (RAW.len() - '/'.len_utf8())]
         })
     }
 
-    pub fn content(&self) -> Result<&str, Error> {
+    pub(crate) fn content(&self) -> Result<&str, Error> {
         self.file_details().map(|entry| entry.content.as_str())
     }
 }
