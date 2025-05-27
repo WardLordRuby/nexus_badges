@@ -119,12 +119,13 @@ Customize the badge output formatting and styling by using the following `set-ar
 
 <div align="center">
     
-  | Flag                        | Description                                                                                       |
-  | :-------------------------- | :------------------------------------------------------------------------------------------------ |
-  | `--style`                   | Badge style [Default: flat] [possible values: flat, flat-square, plastic, for-the-badge, social]  |
-  | `--count`                   | Count to display [Default: total] [possible values: total, unique]                                |
-  | `--label`                   | Badge label [Default: 'Nexus Downloads']                                                          |
-  | `--color` & `--label-color` | Hex color for each side of the badge [Tip: input colors as `'#23282e'` or `23282e`]               |
-  | `--format`                  | Badge output format [Default: Markdown] [possible values: markdown, url, rst, ascii-doc, html]    |
+  | Flag                        | Description                                                                                                 |
+  | :-------------------------- | :---------------------------------------------------------------------------------------------------------- |
+  | `--style`                   | Badge style [Default: flat] [possible values: flat, flat-square, plastic, for-the-badge, social]            |
+  | `--count`                   | Count to display [Default: total] [possible values: total, unique]                                          |
+  | `--label`                   | Badge label [Default: 'Nexus Downloads']                                                                    |
+  | `--color` & `--label-color` | Hex color for each side of the badge [Tip: input colors as `'#23282e'` or `23282e`]                         |
+  | `--label-color-light-mode`  | Light and dark mode label colors are only supported with output format: github-html                         |
+  | `--format`                  | Badge output format [Default: markdown] [possible values: markdown, url, rst, ascii-doc, html, github-html] |
 
 </div>
