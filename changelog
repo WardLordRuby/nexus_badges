@@ -1,5 +1,8 @@
 nexus-badges (0.3.3) unreleased; urgency=low
 
+  * Download counts are now outputted as a formatted string, this
+    ensures large counts are displayed in a more readable fashion as
+    shields.io does not do any formatting tricks.
   * Added new badge format 'github-html'. This format allows users to
     set separate label-colors to be displayed dependent of the browsers
     preferred color scheme.
