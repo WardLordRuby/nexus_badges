@@ -116,7 +116,7 @@ pub struct SetArgs {
     pub label_color: Option<Color>,
 
     /// Specify a hex color for label side of the badge
-    /// {n}  [Note: Providing a light mode theme will force a badges to output as github-html]
+    /// {n}  [Note: Dual theme mode will only be considered when badges output format is github-html]
     #[arg(long, value_name = "COLOR")]
     pub label_color_light_mode: Option<Color>,
 

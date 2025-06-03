@@ -1,4 +1,4 @@
-nexus-badges (0.3.3) unreleased; urgency=low
+nexus-badges (0.3.3) stable; urgency=low
 
   * Download counts are now outputted as a formatted string, this
     ensures large counts are displayed in a more readable fashion as
@@ -8,7 +8,7 @@ nexus-badges (0.3.3) unreleased; urgency=low
     preferred color scheme.
   * Added copyright file to debian package
 
- -- WardLordRuby <@7thWardLord Discord>  Tue, 1 Apr 2025 8:00:00 +0000
+ -- WardLordRuby <@wardlordruby Discord>  Tue, 3 Jun 2025 13:00:00 +0000
 
 nexus-badges (0.3.2) stable; urgency=low
 
@@ -17,7 +17,7 @@ nexus-badges (0.3.2) stable; urgency=low
   * macOS uninstall script now removes config files for all users
   * Updated cli aliases and documentation
 
- -- WardLordRuby <@7thWardLord Discord>  Tue, 14 Jan 2025 02:30:00 +0000
+ -- WardLordRuby <@wardlordruby Discord>  Tue, 14 Jan 2025 02:30:00 +0000
 
 nexus-badges (0.3.1) stable; urgency=medium
 
@@ -28,4 +28,4 @@ nexus-badges (0.3.1) stable; urgency=medium
   * Added pkg install and uninstall script for macOS.
   * Fixed a bug that caused the automation set state command to not work
 
- -- WardLordRuby <@7thWardLord Discord>  Fri, 03 Nov 2024 12:34:56 +0000
+ -- WardLordRuby <@wardlordruby Discord>  Fri, 03 Nov 2024 12:34:56 +0000

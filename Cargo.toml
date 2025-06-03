@@ -1,12 +1,12 @@
 [package]
 name = "nexus_badges"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 
 [package.metadata.winresource]
 ProductName = "Nexus Badges"
 FileDescription = "Badge generator"
-ProductVersion = "0.3.2"
+ProductVersion = "0.3.3"
 
 [dependencies]
 base64 = "0.22.1"
