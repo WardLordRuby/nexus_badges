@@ -57,13 +57,9 @@ fn format_download_ct(count: usize) -> String {
 
     let precision = {
         let mut precision = 2 - delta.log10().floor() as i32;
+        let get_fract_dg = |place| ((delta * 10_f64.powi(place)) as u64 % 10) as u8;
 
-        let get_place_dg = |place: i32| -> u8 {
-            let shifted = delta * 10_f64.powi(place);
-            (shifted.abs() as u64 % 10) as u8
-        };
-
-        while precision > 0 && get_place_dg(precision) == 0 {
+        while precision > 0 && get_fract_dg(precision) == 0 {
             precision -= 1
         }
 
@@ -108,7 +104,7 @@ mod test {
     use super::format_download_ct;
 
     macro_rules! test {
-        ($input:literal, $output:literal) => {
+        ($input:expr, $output:literal) => {
             assert_eq!(format_download_ct($input), $output)
         };
     }
@@ -129,5 +125,6 @@ mod test {
         test!(999_999_999_999, "999T");
         test!(5_835_742_000_000, "5.8e12");
         test!(106_634_154_000_000, "1.1e14");
+        test!(usize::MAX, "1.8e19");
     }
 }
