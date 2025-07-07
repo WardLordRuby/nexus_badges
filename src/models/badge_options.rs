@@ -331,13 +331,11 @@ impl BadgeFormat {
                     write!(f, "\n</picture>")?;
                 }
 
-                writeln!(
-                    f,
-                    "{}",
-                    (!link_url.is_empty())
-                        .then(|| format!("]({link_url})"))
-                        .unwrap_or_default()
-                )?;
+                if !link_url.is_empty() {
+                    writeln!(f, "]({link_url})")
+                } else {
+                    writeln!(f)
+                }?;
             }
             Self::Rst => writeln!(f, ".. image:: {badge_url}\n  :alt: {IMAGE_ALT_TEXT}")?,
             Self::Url => writeln!(f, "{badge_url}")?,
