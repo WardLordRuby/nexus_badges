@@ -61,11 +61,11 @@ impl Update for Vec<Mod> {
         let updated = Input::from(VARS.get().expect("set on startup"), self);
         write(updated, &PATHS.input)?;
 
-        if let Some(new_variable) = new_mod_json {
-            if let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await {
-                println!("{} updated locally", PATHS.input);
-                return Err(err);
-            }
+        if let Some(new_variable) = new_mod_json
+            && let Err(err) = set_repository_variable(ENV_NAME_MODS, &new_variable).await
+        {
+            println!("{} updated locally", PATHS.input);
+            return Err(err);
         }
 
         Ok(())
@@ -204,12 +204,12 @@ pub async fn update_args_local(new: &mut SetArgs) -> Result<(), Error> {
     if keys_modified {
         write(curr_keys, &PATHS.input)?;
 
-        if let Some(ref prev_id) = new.gist {
-            if !prev_id.is_empty() {
-                // MARK: XXX
-                // Do we require confirmation for these kind of overwrites?
-                println!("WARN: Previously stored gist_id: {prev_id}, was replaced");
-            }
+        if let Some(prev_id) = &new.gist
+            && !prev_id.is_empty()
+        {
+            // MARK: XXX
+            // Do we require confirmation for these kind of overwrites?
+            println!("WARN: Previously stored gist_id: {prev_id}, was replaced");
         }
 
         println!("Key(s) updated locally");

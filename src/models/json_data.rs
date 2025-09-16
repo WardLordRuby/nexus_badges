@@ -44,15 +44,17 @@ fn format_download_ct(count: usize) -> String {
 
     let (delta, suf) = {
         const CT_SUF: [char; 3] = ['k', 'M', 'T'];
-        let mut delta = count as f64;
+        const STEP: f64 = 1000.0;
+
+        let mut delta = count as f64 / STEP;
         let mut i = 0;
 
-        while delta >= 1000.0 {
-            delta /= 1000.0;
+        while delta >= STEP {
+            delta /= STEP;
             i += 1;
         }
 
-        (delta, CT_SUF[i - 1])
+        (delta, CT_SUF[i])
     };
 
     let precision = {
