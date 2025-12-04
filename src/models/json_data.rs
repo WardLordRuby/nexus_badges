@@ -43,7 +43,7 @@ fn format_download_ct(count: usize) -> String {
     }
 
     let (delta, suf) = {
-        const CT_SUF: [char; 3] = ['k', 'M', 'T'];
+        const CT_SUF: [char; 3] = ['k', 'M', 'B'];
         const STEP: f64 = 1000.0;
 
         let mut delta = count as f64 / STEP;
@@ -123,8 +123,8 @@ mod test {
         test!(6_156_000, "6.15M");
         test!(45_425_000, "45.4M");
         test!(346_425_000, "346M");
-        test!(3_634_425_000, "3.63T");
-        test!(999_999_999_999, "999T");
+        test!(3_634_425_000, "3.63B");
+        test!(999_999_999_999, "999B");
         test!(5_835_742_000_000, "5.8e12");
         test!(106_634_154_000_000, "1.1e14");
         test!(usize::MAX, "1.8e19");

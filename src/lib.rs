@@ -22,7 +22,7 @@ use crate::{
 use constcat::concat;
 use percent_encoding::{AsciiSet, CONTROLS};
 use reqwest::StatusCode;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::{
     borrow::Cow,
     collections::BTreeMap,
@@ -432,7 +432,7 @@ pub fn startup(on_remote: bool) -> Result<Vec<Mod>, Error> {
     Ok(input.mods)
 }
 
-pub(crate) fn read<T: for<'de> Deserialize<'de>>(path: &str) -> Result<T, Error> {
+pub(crate) fn read<T: DeserializeOwned>(path: &str) -> Result<T, Error> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let data = serde_json::from_reader(reader)?;
@@ -460,10 +460,13 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
 
     let encoded_fields = badge_prefs.encoded_fields(universal_url, URL_ENCODE_SET);
 
-    writeln!(writer, "# Shields.io Badges via Nexus Badges")?;
-    writeln!(writer, "Base template: {BADGE_URL}")?;
-    writeln!(writer, "Data source URL: {universal_url}")?;
-    writeln!(writer, "{badge_prefs}")?;
+    writeln!(
+        writer,
+        "# Shields.io Badges via Nexus Badges\n\
+        Base template: {BADGE_URL}\n\
+        Data source URL: {universal_url}\n\n\
+        {badge_prefs}\n"
+    )?;
 
     for (uid, entry) in output.into_iter() {
         let query = format!("$.{uid}.{}", badge_prefs.count.field_name());
@@ -475,9 +478,7 @@ fn write_badges(output: BTreeMap<String, ModDetails>, universal_url: &str) -> Re
             &query,
             &entry.url,
         )?;
-        writeln!(writer)?;
-        writeln!(writer, "Configuration:")?;
-        writeln!(writer, "- Query: {query}")?;
+        writeln!(writer, "\nConfiguration:\n- Query: {query}")?;
         if !entry.url.is_empty() {
             writeln!(writer, "- Link: {}", entry.url)?;
         }

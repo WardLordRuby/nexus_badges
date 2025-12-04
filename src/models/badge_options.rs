@@ -53,12 +53,16 @@ impl Default for BadgePreferences {
 
 impl Display for BadgePreferences {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Style preferences:")?;
-        writeln!(f, "- Label: {}", self.label)?;
-        writeln!(f, "- Count: {}", self.count)?;
-        writeln!(f, "- Style: {}", self.style)?;
-        writeln!(f, "- Format: {}", self.format)?;
-        writeln!(f, "- Label color: {}", self.label_color)?;
+        writeln!(
+            f,
+            "Style preferences:\n\
+            - Label: {}\n\
+            - Count: {}\n\
+            - Style: {}\n\
+            - Format: {}\n\
+            - Label color: {}",
+            self.label, self.count, self.style, self.format, self.label_color
+        )?;
         if self.label_color_light_mode.is_some() && matches!(self.format, BadgeFormat::GithubHtml) {
             writeln!(
                 f,
@@ -66,8 +70,7 @@ impl Display for BadgePreferences {
                 self.label_color_light_mode
             )?;
         }
-        writeln!(f, "- Color: {}", self.color)?;
-        Ok(())
+        write!(f, "- Color: {}", self.color)
     }
 }
 
