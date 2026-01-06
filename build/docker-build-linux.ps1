@@ -39,7 +39,7 @@ if (Get-Command "debforge" -ErrorAction SilentlyContinue) {
         Copy-Item "build/debforge/target/release/debforge.exe" "build/debforge.exe"
     
         # Remove debforge source files
-        Remove-Item -Path "debforge" -Recurse -Force
+        Remove-Item -Path "build/debforge" -Recurse -Force
     }
     
     # Create the expected debian file structure
